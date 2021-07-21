@@ -166,64 +166,9 @@ class JsonCustomEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-def motif_extra_data_json_to_df(store, path):
-    import pandas as pd
-
-    with open(path, 'rt') as f:
-        records = json.load(f)
-        df = pd.DataFrame(records)
-
-        if not df.empty:
-            df = df[df['frame_number'] >= 0]
-
-        if not df.empty:
-
-            if 'sensor_time' in df.columns:
-                by = ['frame_index','sensor_time']
-            else:
-                by = ['frame_index']
-
-            try:
-                return df.sort_values(by=by, ignore_index=True)
-            except TypeError:
-                return df.sort_values(by=by).reset_index(drop=True)
-
-
-def motif_get_parse_true_fps(store, default=25.0, hwardware_only=False):
-    md = store.user_metadata
-    if 'hwframerate' in md:
-        return float(md['hwframerate'])
-    elif 'motifptpframerate' in md:
-        return float(md['motifptpframerate'])
-    elif (not hwardware_only) and \
-            (md.get('acquisitionframerate') and (md.get('acquisitionframerateenable', False) is True)):
-        return float(md['acquisitionframerate'])
-    elif default is None:
-        return 1.0 / np.median(np.diff(store._get_chunk_metadata(0)['frame_time']))
-    return default
-
-
-def motif_extra_data_h5_attrs(path):
-    import h5py
-
-    attrs = {}
-    with h5py.File(path, 'r') as f:
-        attrs['_datasets'] = [s.strip() for s in f.attrs['datasets'].decode('ascii').split(',')]
-        for g in f.keys():
-            attrs[g] = dict(f[g].attrs)
-
-    return attrs
-
-
-def motif_extra_data_h5_to_df(store, path):
+def motif_extra_data_h5_to_df(path):
     import h5py
     import pandas as pd
-
-    def _attr_string(_s):
-        try:
-            return _s.decode('ascii')
-        except AttributeError:
-            return _s
 
     with h5py.File(path, 'r') as f:
         dat = {}
@@ -237,12 +182,11 @@ def motif_extra_data_h5_to_df(store, path):
         mask = camera['frame_number'] >= 0
 
         # motif stores the names of datasets in a root attribute
-        datasets = [s.strip() for s in _attr_string(f.attrs['datasets']).split(',')]
+        datasets = [s.strip() for s in f.attrs['datasets'].decode('ascii').split(',')]
 
         for dsname in datasets:
             ds = f[dsname]
-            col_names = [s.strip() for s in _attr_string(ds.attrs['column_names']).split(',')]
-
+            col_names = [s.strip() for s in ds.attrs['column_names'].decode('ascii').split(',')]
             # trim the array
             arr = ds[..., mask]
 
