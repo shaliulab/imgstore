@@ -38,7 +38,7 @@ setup(
     ],
     install_requires=[
         'numpy',
-        'pandas',
+        'pandas<=1.2.4',
         'pyyaml',
         'pytz',
         'tzlocal',
