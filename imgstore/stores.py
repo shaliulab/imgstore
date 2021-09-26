@@ -1076,14 +1076,14 @@ class VideoImgStore(_ImgStore):
                                             fourcc=self._codec,
                                             fps=self._fps,
                                             frameSize=(w, h),
-                                            isColor=True)
+                                            isColor=self._isColor)
             except TypeError:
                 self._log.error('old (< 3.2) cv2 not supported (this is %r)' % (cv2.__version__,))
                 self._cap = cv2.VideoWriter(filename=fn,
                                             fourcc=self._codec,
                                             fps=self._fps,
                                             frameSize=(w, h),
-                                            isColor=True)
+                                            isColor=self._isColor)
 
             self._capfn = fn
             self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
@@ -1253,9 +1253,11 @@ def new_for_filename(path, **kwargs):
     return cls(**kwargs)
 
 
-def new_for_format(fmt, path=None, **kwargs):
+def new_for_format(fmt, path=None, isColor=True, **kwargs):
     if 'mode' not in kwargs:
         kwargs['mode'] = 'w'
+
+    self._isColor = isColor
 
     if kwargs.get('mode') == 'r':
         return new_for_filename(path, **kwargs)
