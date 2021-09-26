@@ -1257,7 +1257,7 @@ def new_for_format(fmt, path=None, isColor=True, **kwargs):
     if 'mode' not in kwargs:
         kwargs['mode'] = 'w'
 
-    self._isColor = isColor
+    
 
     if kwargs.get('mode') == 'r':
         return new_for_filename(path, **kwargs)
@@ -1266,7 +1266,8 @@ def new_for_format(fmt, path=None, isColor=True, **kwargs):
     basedir, _ = _parse_basedir_fullpath(path, kwargs.pop('basedir', None),
                                          read=kwargs.get('mode') == 'r')
     kwargs['basedir'] = basedir
-
+    kwargs['isColor'] = isColor
+    
     for cls in (DirectoryImgStore, VideoImgStore):
         if cls.supports_format(fmt):
             kwargs['format'] = fmt
