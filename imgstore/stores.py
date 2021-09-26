@@ -953,10 +953,11 @@ class VideoImgStore(_ImgStore):
 
     _DEFAULT_CHUNKSIZE = 10000
 
-    def __init__(self, **kwargs):
+    def __init__(self, framerate=25, **kwargs):
 
         self._cap = None
         self._capfn = None
+        self._fps = framerate
 
         fmt = kwargs.get('format')
         # backwards compat
@@ -1073,14 +1074,14 @@ class VideoImgStore(_ImgStore):
                 self._cap = cv2.VideoWriter(filename=fn,
                                             apiPreference=cv2.CAP_FFMPEG,
                                             fourcc=self._codec,
-                                            fps=25,
+                                            fps=self._fps,
                                             frameSize=(w, h),
                                             isColor=True)
             except TypeError:
                 self._log.error('old (< 3.2) cv2 not supported (this is %r)' % (cv2.__version__,))
                 self._cap = cv2.VideoWriter(filename=fn,
                                             fourcc=self._codec,
-                                            fps=25,
+                                            fps=self._fps,
                                             frameSize=(w, h),
                                             isColor=True)
 
