@@ -824,7 +824,7 @@ class DirectoryImgStore(_ImgStore):
 
     _DEFAULT_CHUNKSIZE = 200
 
-    def __init__(self, **kwargs):
+    def __init__(self, framerate=None, isColor=False, **kwargs):
 
         self._chunk_cdir = ''
         self._chunk_md = {}
@@ -953,11 +953,12 @@ class VideoImgStore(_ImgStore):
 
     _DEFAULT_CHUNKSIZE = 10000
 
-    def __init__(self, framerate=25, **kwargs):
+    def __init__(self, framerate=25, isColor=False, **kwargs):
 
         self._cap = None
         self._capfn = None
         self._fps = framerate
+        self._isColor = isColor
 
         fmt = kwargs.get('format')
         # backwards compat
@@ -1253,7 +1254,7 @@ def new_for_filename(path, **kwargs):
     return cls(**kwargs)
 
 
-def new_for_format(fmt, path=None, isColor=True, **kwargs):
+def new_for_format(fmt, path=None, **kwargs):
     if 'mode' not in kwargs:
         kwargs['mode'] = 'w'
 
@@ -1266,7 +1267,6 @@ def new_for_format(fmt, path=None, isColor=True, **kwargs):
     basedir, _ = _parse_basedir_fullpath(path, kwargs.pop('basedir', None),
                                          read=kwargs.get('mode') == 'r')
     kwargs['basedir'] = basedir
-    kwargs['isColor'] = isColor
     
     for cls in (DirectoryImgStore, VideoImgStore):
         if cls.supports_format(fmt):
