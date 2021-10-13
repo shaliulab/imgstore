@@ -1093,7 +1093,7 @@ class VideoImgStore(_ImgStore):
 
     @property
     def rev_index(self):
-        if self._rev_index is None:
+        if self.get("_rev_index", None) is None:
             self._rev_index = {v: k for k, v in self._index.items()}
 
         return self._rev_index
