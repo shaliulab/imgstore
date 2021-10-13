@@ -617,6 +617,7 @@ class _ImgStore(object):
     def get_next_framenumber(self):
         return self._get_next_framenumber_and_chunk_frame_idx()[0]
 
+
     def _get_image(self, chunk_n, frame_idx):
         if chunk_n is not None:
             self._load_chunk(chunk_n)
@@ -628,6 +629,21 @@ class _ImgStore(object):
         self.frame_number = _frame_number
 
         return img, (_frame_number, _frame_timestamp)
+
+
+    def _get_image_by_time(self, chunk_n, time_s):
+
+        log = logging.getLogger('imgstore')
+
+        chunk_metadata = self._index.get_chunk_metadata(chunk_n)
+        diff_t = chunk_metadata["frame_time"][1] - chunk_metadata["frame_time"][0]
+        t0 = chunk_metadata["frame_time"][0] - diff_t
+        absolute_time = 1000* time_s + t0
+        first_frame = [t > absolute_time for t in chunk_metadata["frame_time"]].index(True)
+        idx = chunk_metadata["frame_number"][first_frame] - chunk_metadata["frame_number"][0]
+        log.info(f"Loading frame: {idx}")
+        return self._get_image(chunk_n, idx)
+
 
     def get_next_image(self):
         frame_number, idx = self._get_next_framenumber_and_chunk_frame_idx()
@@ -1091,26 +1107,12 @@ class VideoImgStore(_ImgStore):
             self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
 
 
-    @property
-    def rev_index(self):
-        if getattr(self, "_rev_index", None) is None:
-            self._rev_index = {v: k for k, v in self._index.items()}
+    # @property
+    # def rev_index(self):
+    #     if getattr(self, "_rev_index", None) is None:
+    #         self._rev_index = {v: k for k, v in self._index.items()}
 
-        return self._rev_index
-
-    def load_by_chunk_time(self, chunk, time):
-
-        log = logging.getLogger('imgstore')
-        
-        first_frame_of_chunk = self.rev_index[chunk][0]
-        fps = getattr(self, "_fps", None)
-        if fps is None:
-            raise Exception("Sorry, I dont know what FPS was used on this imgstore. Please set the _fps attribute")
-        idx = first_frame_of_chunk + time * fps
-        log.info(f"Loading frame: {idx}")
-        return self._load_image(idx)
-
-
+    #     return self._rev_index
 
     def _load_image(self, idx):
         if self._supports_seeking:
