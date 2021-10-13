@@ -265,7 +265,8 @@ class _ImgStore(object):
         self._created_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
         self._timezone_local = tzlocal.get_localzone()
 
-        store_md = {'imgshape': write_imgshape,
+        store_md = {'framerate': self.get("_fps", None), 
+                    'imgshape': write_imgshape,
                     'imgdtype': self._imgdtype,
                     'chunksize': chunksize,
                     'format': fmt,
@@ -1089,6 +1090,28 @@ class VideoImgStore(_ImgStore):
             self._capfn = fn
             self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
 
+
+    @property
+    def rev_index(self):
+        if self._rev_index is None
+            self._rev_index = {v: k for k, v in self._index.items()}
+
+        return self._rev_index
+
+    def load_by_chunk_time(self, chunk, time):
+
+        log = logging.getLogger('imgstore')
+        
+        first_frame_of_chunk = self.rev_index[chunk][0]
+        fps = get(self, "_fps", None)
+        if fps is None:
+            raise Exception("Sorry, I dont know what FPS was used on this imgstore. Please set the _fps attribute")
+        idx = first_frame_of_chunk + time * fps
+        log.info(f"Loading frame: {idx}")
+        return self._load_image(idx)
+        
+
+
     def _load_image(self, idx):
         if self._supports_seeking:
             # only seek if we have to, otherwise take the fast path
@@ -1257,8 +1280,6 @@ def new_for_filename(path, **kwargs):
 def new_for_format(fmt, path=None, **kwargs):
     if 'mode' not in kwargs:
         kwargs['mode'] = 'w'
-
-    
 
     if kwargs.get('mode') == 'r':
         return new_for_filename(path, **kwargs)
