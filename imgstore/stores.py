@@ -265,7 +265,7 @@ class _ImgStore(object):
         self._created_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
         self._timezone_local = tzlocal.get_localzone()
 
-        store_md = {'framerate': self.get("_fps", None), 
+        store_md = {'framerate': getattr(self, "_fps", None), 
                     'imgshape': write_imgshape,
                     'imgdtype': self._imgdtype,
                     'chunksize': chunksize,
@@ -1093,7 +1093,7 @@ class VideoImgStore(_ImgStore):
 
     @property
     def rev_index(self):
-        if self.get("_rev_index", None) is None:
+        if getattr(self, "_rev_index", None) is None:
             self._rev_index = {v: k for k, v in self._index.items()}
 
         return self._rev_index
@@ -1103,7 +1103,7 @@ class VideoImgStore(_ImgStore):
         log = logging.getLogger('imgstore')
         
         first_frame_of_chunk = self.rev_index[chunk][0]
-        fps = get(self, "_fps", None)
+        fps = getattr(self, "_fps", None)
         if fps is None:
             raise Exception("Sorry, I dont know what FPS was used on this imgstore. Please set the _fps attribute")
         idx = first_frame_of_chunk + time * fps
