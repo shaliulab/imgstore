@@ -954,7 +954,7 @@ class VideoImgStore(_ImgStore):
 
     _DEFAULT_CHUNKSIZE = 10000
 
-    def __init__(self, framerate=25, isColor=False, **kwargs):
+    def __init__(self, framerate=None, isColor=False, **kwargs):
 
         self._cap = None
         self._capfn = None
