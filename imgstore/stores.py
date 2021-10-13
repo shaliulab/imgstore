@@ -1093,7 +1093,7 @@ class VideoImgStore(_ImgStore):
 
     @property
     def rev_index(self):
-        if self._rev_index is None
+        if self._rev_index is None:
             self._rev_index = {v: k for k, v in self._index.items()}
 
         return self._rev_index
@@ -1109,7 +1109,7 @@ class VideoImgStore(_ImgStore):
         idx = first_frame_of_chunk + time * fps
         log.info(f"Loading frame: {idx}")
         return self._load_image(idx)
-        
+
 
 
     def _load_image(self, idx):
