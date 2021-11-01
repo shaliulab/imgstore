@@ -51,7 +51,7 @@ class ImgStoreExport:
             isColor = False
 
         extension = output.split(".")[-1]
-        fmts = [e.split("/" for e in self._cv2_fmts.keys()]
+        fmts = [e.split("/") for e in self._cv2_fmts.keys()]
         fmts = [e for e in fmts if e != ""]
         fmts = " ".join(fmts)
         key=[k if extension in k for k in self._cv2_fmts.keys()]
