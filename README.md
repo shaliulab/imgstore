@@ -162,3 +162,8 @@ windows.
 **Even if some _write_ tests fail due to these issues, you can stil use the imgstore package to _read_ h264 encoded
 video files.**
 
+
+## Mods
+
+* Dont hardcode framerate and isColor of cv2.VideoWriter, instead make them arguments of the stores' __init__
+* Convenience export module to save several chunks as one file
