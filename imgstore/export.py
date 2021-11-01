@@ -6,7 +6,7 @@ import cv2
 
 class ImgStoreExport:
 
-    def to_videofile(output, framerate=None, frame_number: Iterable = None, frame_time: Iterable = None):
+    def to_videofile(self, output, framerate=None, frame_number: Iterable = None, frame_time: Iterable = None):
 
         if frame_number is None and frame_time is None:
             raise Exception("Please pass an interval of frame indices or timestamps")
