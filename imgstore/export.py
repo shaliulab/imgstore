@@ -43,7 +43,7 @@ class ImgStoreExport:
         if framerate is None:
             framerate = self._fps
 
-        resolution = self._metadata["imgshape"]
+        resolution = tuple(self._metadata["imgshape"])
 
         if len(resolution) == 3:
             isColor = True
@@ -59,7 +59,7 @@ class ImgStoreExport:
         )
 
 
-        for i, idx in tqmd.tqdm(enumerate(frame_indices)):
+        for i, idx in tqdm.tqdm(enumerate(frame_indices)):
             img, (retrieved_idx, _) = self.get_image(idx)
             assert idx == retrieved_idx
             video_writer.write(img)
