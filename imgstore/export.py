@@ -35,6 +35,7 @@ class ImgStoreExport:
             pass
             # frame_number = frame_number
 
+        frame_number[-1] += 1
         frame_indices = list(range(*frame_number))
         
         if framerate is None:
