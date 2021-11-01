@@ -31,7 +31,7 @@ from .constants import DEVNULL, STORE_MD_FILENAME, STORE_LOCK_FILENAME, STORE_MD
 from .util import ImageCodecProcessor, JsonCustomEncoder, FourCC, ensure_color,\
     ensure_grayscale, motif_extra_data_h5_to_df, motif_extra_data_json_to_df, motif_extra_data_h5_attrs
 from .index import ImgStoreIndex
-
+from .export import ImgStoreExport
 
 _VERBOSE_DEBUG_GETS = False
 _VERBOSE_DEBUG_CHUNKS = False
@@ -48,7 +48,7 @@ def _extract_store_metadata(full_path):
 # whereas frame_index refers to the global frame_index from (0, frame_count]
 
 
-class _ImgStore(object):
+class _ImgStore(ImgStoreExport):
     _version = 2
     _supported_modes = ''
 
