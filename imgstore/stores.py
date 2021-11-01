@@ -48,7 +48,7 @@ def _extract_store_metadata(full_path):
 # whereas frame_index refers to the global frame_index from (0, frame_count]
 
 
-class _ImgStore(ImgStoreExport):
+class _ImgStore(object):
     _version = 2
     _supported_modes = ''
 
@@ -943,7 +943,7 @@ class DirectoryImgStore(_ImgStore):
         return self._format != 'jpg'
 
 
-class VideoImgStore(_ImgStore):
+class VideoImgStore(_ImgStore, ImgStoreExport):
     _supported_modes = 'wr'
 
     _cv2_fmts = {'mjpeg': FourCC('M', 'J', 'P', 'G'),

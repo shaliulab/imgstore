@@ -49,10 +49,22 @@ class ImgStoreExport:
             isColor = True
         else:
             isColor = False
+
+        extension = output.split(".")[-1]
+        fmts = [e.split("/" for e in self._cv2_fmts.keys()]
+        fmts = [e for e in fmts if e != ""]
+        fmts = " ".join(fmts)
+        key=[k if extension in k for k in self._cv2_fmts.keys()]
+        if len(key) == 0:
+            raise Exception("""
+            No codec available for this format.
+            Supported formats are
+            """ + fmts)
+        
         
         video_writer = cv2.VideoWriter(
             output,
-            cv2.VideoWriter_fourcc(*"DIVX"),
+            self._cv2_fmts[key],
             framerate,
             resolution,
             isColor=isColor
