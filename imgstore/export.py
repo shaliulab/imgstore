@@ -28,14 +28,16 @@ class ImgStoreExport:
             for t in frame_time:
                 frame_number.append(int(metadata_df.loc[metadata_df["frame_time"] == t]["frame_number"].values[0]))
             
-            frame_number = tuple(frame_number)
         
         # for readability
         else:
             pass
             # frame_number = frame_number
 
+        frame_number = list(frame_number)
         frame_number[-1] += 1
+        frame_number = tuple(frame_number)
+
         frame_indices = list(range(*frame_number))
         
         if framerate is None:
