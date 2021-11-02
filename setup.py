@@ -14,9 +14,11 @@ with open(op.join(this_directory, 'README.md'), 'rb') as f:
     long_description = f.read().decode('UTF-8')
 
 
+
 repo = git.Repo()
 git_hash = repo.head.object.hexsha
-version = '0.3.1.' + git_hash
+# attention. you need to update the numbers ALSO in the imgstore/__init__.py file
+version = "0.3.1" + "." + git_hash
 
 setup(
     name='imgstore',
