@@ -56,7 +56,7 @@ class _ImgStore(object):
 
     # noinspection PyShadowingBuiltins
     def __init__(self, basedir, mode, imgshape=None, imgdtype=np.uint8, chunksize=None, metadata=None,
-                 encoding=None, write_encode_encoding=None, format=None, index=None):
+                 encoding=None, write_encode_encoding=None, format=None, index=None, **kwargs):
         if mode not in self._supported_modes:
             raise ValueError('mode not supported')
 
@@ -117,7 +117,7 @@ class _ImgStore(object):
             if None in (imgshape, imgdtype, chunksize, format):
                 raise ValueError('imgshape, imgdtype, chunksize, format must not be None')
             self._frame_n = 0
-            self._init_write(imgshape, imgdtype, chunksize, metadata, encoding, write_encode_encoding, format)
+            self._init_write(imgshape, imgdtype, chunksize, metadata, encoding, write_encode_encoding, format, **kwargs)
         elif mode == 'r':
             self._init_read()
 
@@ -236,7 +236,7 @@ class _ImgStore(object):
         self._codec_proc.set_default_code(self._encoding)
         self._decode_image = self._codec_proc.autoconvert
 
-    def _init_write(self, imgshape, imgdtype, chunksize, metadata, encoding, write_encode_encoding, fmt):
+    def _init_write(self, imgshape, imgdtype, chunksize, metadata, encoding, write_encode_encoding, fmt, **kwargs):
         for e in (encoding, write_encode_encoding):
             if e:
                 if not self._codec_proc.check_code(e):
@@ -276,6 +276,8 @@ class _ImgStore(object):
                     'created_utc': self._created_utc.replace(tzinfo=None).isoformat(),
                     'timezone_local': str(self._timezone_local),
                     'uuid': self._uuid}
+
+        store_md.update(kwargs)
 
         if metadata is None:
             metadata = {STORE_MD_KEY: store_md}
