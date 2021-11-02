@@ -20,6 +20,9 @@ git_hash = repo.head.object.hexsha
 # attention. you need to update the numbers ALSO in the imgstore/__init__.py file
 version = "0.3.1" + "." + git_hash
 
+with open("imgstore/_version.py", "w") as fh:
+    fh.write(f"__version__ = '{version}'\n")
+
 setup(
     name='imgstore',
     license='BSD 3 clause',
