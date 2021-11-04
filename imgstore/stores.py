@@ -575,7 +575,8 @@ class _ImgStore(object):
         self._decode_image = lambda x: x
 
     def add_image(self, img, frame_number, frame_time):
-        self._save_image(self._encode_image(img), frame_number, frame_time)
+        frame = self._encode_image(img)
+        self._save_image(frame, frame_number, frame_time)
 
         self.frame_max = np.nanmax((frame_number, self.frame_max))
         self.frame_min = np.nanmin((frame_number, self.frame_min))
@@ -1059,8 +1060,7 @@ class VideoImgStore(_ImgStore, ImgStoreExport):
 
     def _save_image(self, img, frame_number, frame_time):
         # we always write color because its more supported
-        frame = ensure_color(img)
-        self._cap.write(frame)
+        self._cap.write(img)
         if not os.path.isfile(self._capfn):
             raise Exception('Your opencv build does support writing this codec')
         self._save_image_metadata(frame_number, frame_time)
