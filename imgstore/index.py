@@ -196,7 +196,6 @@ class ImgStoreIndex(object):
             return None
 
 
-
     def get_chunk_and_frame_idx(self, frame_number):
         """
         Given a frame_number, return the chunk to which it belongs,
@@ -207,7 +206,7 @@ class ImgStoreIndex(object):
         cur.execute(f"SELECT chunk, frame_idx FROM frames where frame_number = {frame_number}")
         data = []
         for d in cur:
-            data.append(d[0])
+            data.extend(d)
         if data:
             chunk, frame_idx = data
             return chunk, frame_idx
