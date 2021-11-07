@@ -176,6 +176,32 @@ class ImgStoreIndex(object):
         cur.execute("SELECT frame_number, frame_time FROM frames WHERE chunk = ? ORDER BY rowid;", (chunk_n, ))
         return self._get_metadata(cur)
 
+    def get_chunk_interval(self, chunk_n, metavar="frame_time"):
+        """
+        Given a chunk number, return the first and last value of the metavar for that chunk
+        By default metavar is frame_time, which consists of the time in ms at which each frame was taken
+        """
+        cur = self._conn.cursor()
+        # from https://stackoverflow.com/a/12133952/3541756
+        row_number = "row_number() over (order by frame_number desc) as rn"
+        row_count = f"count(*) over () as total_count FROM frames WHERE chunk={chunk_n}"
+        cur.execute(f"SELECT {metavar} from (SELECT {metavar}, {row_number}, {row_count}) where rn=1 or rn=total_count ORDER BY rn DESC;")
+        start, end = tuple((e[0] for e in cur))
+        return start, end
+
+
+    def get_chunk_and_frame_idx(self, frame_number):
+        """
+        Given a frame_number, return the chunk to which it belongs,
+        and the index of the frame inside the chunk
+        (where the first frame of the chunk has index 0)
+        """
+        cur = self._conn.cursor()
+        cur.execute("SELECT chunk, frame_idx FROM frames where frame_number = 4000")
+        chunk, frame_idx = ((e[0] for e in c))
+        return chunk, frame_idx
+
+
     def find_chunk(self, what, value):
         assert what in ('frame_number', 'frame_time', 'index')
         cur = self._conn.cursor()
