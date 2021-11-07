@@ -186,8 +186,15 @@ class ImgStoreIndex(object):
         row_number = "row_number() over (order by frame_number desc) as rn"
         row_count = f"count(*) over () as total_count FROM frames WHERE chunk={chunk_n}"
         cur.execute(f"SELECT {metavar} from (SELECT {metavar}, {row_number}, {row_count}) where rn=1 or rn=total_count ORDER BY rn DESC;")
-        start, end = tuple((e[0] for e in cur))
-        return start, end
+
+        for d in cur:
+            data.append(d[0])
+        if data:
+            start, end = data
+            return start, end
+        else:
+            return None
+
 
 
     def get_chunk_and_frame_idx(self, frame_number):
@@ -197,9 +204,15 @@ class ImgStoreIndex(object):
         (where the first frame of the chunk has index 0)
         """
         cur = self._conn.cursor()
-        cur.execute("SELECT chunk, frame_idx FROM frames where frame_number = 4000")
-        chunk, frame_idx = ((e[0] for e in cur))
-        return chunk, frame_idx
+        cur.execute(f"SELECT chunk, frame_idx FROM frames where frame_number = {frame_number}")
+        data = []
+        for d in cur:
+            data.append(d[0])
+        if data:
+            chunk, frame_idx = data
+            return chunk, frame_idx
+        else:
+            return None
 
 
     def find_chunk(self, what, value):
