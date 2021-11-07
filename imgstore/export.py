@@ -6,7 +6,7 @@ import cv2
 
 class ImgStoreExport:
 
-    def to_videofile(self, output, framerate=None, frame_number: Iterable = None, frame_time: Iterable = None):
+    def to_videofile(self, output, framerate=None, frame_number: Iterable = None, frame_time: Iterable = None, roi: tuple =None):
 
         if frame_number is None and frame_time is None:
             raise Exception("Please pass an interval of frame indices or timestamps")
@@ -43,7 +43,10 @@ class ImgStoreExport:
         if framerate is None:
             framerate = self._fps
 
-        resolution = tuple(self._metadata["imgshape"])
+        if roi is None:
+            resolution = tuple(self._metadata["imgshape"][::-1])
+        else:
+            resolution = (roi[2], roi[3])
 
         if len(resolution) == 3:
             isColor = True
@@ -51,30 +54,43 @@ class ImgStoreExport:
             isColor = False
 
         extension = output.split(".")[-1]
-        fmts = [e.split("/") for e in self._cv2_fmts.keys()]
-        fmts = [e for e in fmts if e != ""]
-        fmts = " ".join(fmts)
-        key=[k if extension in k for k in self._cv2_fmts.keys()]
-        if len(key) == 0:
-            raise Exception("""
-            No codec available for this format.
-            Supported formats are
-            """ + fmts)
-        
-        
+        if extension == ".mp4":
+            encoder = cv2.VideoWriter_fourcc(*"mp4v")
+        else:
+            fmts = [e.split("/")[1] for e in self._cv2_fmts.keys() if "/" in e]
+            fmts = " ".join(fmts)
+            key=[k for k in self._cv2_fmts.keys() if extension in k]
+
+            if len(key) == 0:
+                raise Exception("""
+                No encoder available for this format.
+                Supported formats are
+                """ + fmts)
+            
+            key=key[0]
+            # import ipdb; ipdb.set_trace()
+            encoder = self._cv2_fmts[key]
+
+            
         video_writer = cv2.VideoWriter(
             output,
-            self._cv2_fmts[key],
+            encoder,
             framerate,
             resolution,
             isColor=isColor
         )
 
+        # import ipdb; ipdb.set_trace()
 
         for i, idx in tqdm.tqdm(enumerate(frame_indices)):
             img, (retrieved_idx, _) = self.get_image(idx)
             assert idx == retrieved_idx
-            video_writer.write(img)
+
+            if not roi is None:
+                x, y, width, height = roi
+                video_writer.write(img[y:(y+height), x:(x+width)])
+            else:
+                video_writer.write(img)
 
 
         video_writer.release()

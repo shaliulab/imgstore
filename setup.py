@@ -7,9 +7,21 @@
 import os.path as op
 from setuptools import setup, find_packages
 
+import git
+
 this_directory = op.abspath(op.dirname(__file__))
 with open(op.join(this_directory, 'README.md'), 'rb') as f:
     long_description = f.read().decode('UTF-8')
+
+
+
+repo = git.Repo()
+git_hash = repo.head.object.hexsha
+# attention. you need to update the numbers ALSO in the imgstore/__init__.py file
+version = "0.3.1" + "." + git_hash
+
+with open("imgstore/_version.py", "w") as fh:
+    fh.write(f"__version__ = '{version}'\n")
 
 setup(
     name='imgstore',
@@ -18,7 +30,7 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     include_package_data=True,
-    version='0.3.0',
+    version=version,
     url='https://github.com/loopbio/imgstore',
     author='John Stowers, Santi Villalba',
     author_email='john@loopbio.com, santi@loopbio.com',
@@ -43,6 +55,7 @@ setup(
         'pytz',
         'tzlocal',
         'python-dateutil',
+        'gitpython'
     ],
     tests_require=[
         'pytest',
