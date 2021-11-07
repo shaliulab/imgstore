@@ -187,6 +187,7 @@ class ImgStoreIndex(object):
         row_count = f"count(*) over () as total_count FROM frames WHERE chunk={chunk_n}"
         cur.execute(f"SELECT {metavar} from (SELECT {metavar}, {row_number}, {row_count}) where rn=1 or rn=total_count ORDER BY rn DESC;")
 
+        data = []
         for d in cur:
             data.append(d[0])
         if data:
