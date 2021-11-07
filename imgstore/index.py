@@ -198,7 +198,7 @@ class ImgStoreIndex(object):
         """
         cur = self._conn.cursor()
         cur.execute("SELECT chunk, frame_idx FROM frames where frame_number = 4000")
-        chunk, frame_idx = ((e[0] for e in c))
+        chunk, frame_idx = ((e[0] for e in cur))
         return chunk, frame_idx
 
 
