@@ -1055,7 +1055,7 @@ class VideoImgStore(_ImgStore, ImgStoreExport):
     def _find_chunks(self, chunk_numbers):
         if chunk_numbers is None:
             avis = map(os.path.basename, glob.glob(os.path.join(self._basedir, '*%s' % self._ext)))
-            chunk_numbers = list(map(int, map(operator.itemgetter(0), map(lambda x: x.split(".")[0], avis))))
+            chunk_numbers = list(map(int, map(operator.itemgetter(0), map(lambda x: x.split("."), avis))))
         return list(zip(chunk_numbers, tuple(os.path.join(self._basedir, '%06d' % n) for n in chunk_numbers)))
 
     def _save_image(self, img, frame_number, frame_time):
