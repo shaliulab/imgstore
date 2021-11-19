@@ -67,6 +67,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'imgstore-sensor = imgstore.apps:main_sensor',
             'imgstore-view = imgstore.apps:main_viewer',
             'imgstore-save = imgstore.apps:main_saver',
             'imgstore-test = imgstore.apps:main_test',
