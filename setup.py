@@ -55,7 +55,7 @@ setup(
         'pytz',
         'tzlocal',
         'python-dateutil',
-        'gitpython'
+        'gitpython',
     ],
     tests_require=[
         'pytest',
