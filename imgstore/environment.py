@@ -131,7 +131,7 @@ def main(args=None):
         output_folder = args.input
         prefix =  os.path.basename(args.input.strip("/"))
 
-    elif args.environment_data:
+    elif args.environment_csv:
         env_data = pd.read_csv(args.environment_csv, index_col=0)
         title = os.path.basename(args.environment_csv)
         output_folder = os.path.dirname(args.environment_csv)
