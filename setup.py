@@ -23,6 +23,9 @@ version = "0.3.1" + "." + git_hash
 with open("imgstore/_version.py", "w") as fh:
     fh.write(f"__version__ = '{version}'\n")
 
+packages = find_packages()
+print(packages)
+
 setup(
     name='imgstore',
     license='BSD 3 clause',
@@ -34,7 +37,7 @@ setup(
     url='https://github.com/loopbio/imgstore',
     author='John Stowers, Santi Villalba',
     author_email='john@loopbio.com, santi@loopbio.com',
-    packages=find_packages(),
+    packages=packages,
     classifiers=[
         'Intended Audience :: Science/Research',
         'Intended Audience :: Developers',
@@ -55,7 +58,8 @@ setup(
         'pytz',
         'tzlocal',
         'python-dateutil',
-        'gitpython'
+        'gitpython',
+        'shapely>=1.7.1',
     ],
     tests_require=[
         'pytest',

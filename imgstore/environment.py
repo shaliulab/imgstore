@@ -4,7 +4,7 @@ Module to read and analyze the environmental metadata in .extra.json files
 
 import argparse
 import os.path
-import rle
+import imgstore.utils.rle
 import datetime
 
 import imgstore
@@ -19,8 +19,8 @@ import matplotlib.pyplot as plt
 def get_parser():
 
     ap = argparse.ArgumentParser()
-    ap.add.argument("--experiment-path", "--input", dest="input", required=True)
-    ap.add.argument("--output", dest="output", required=True)
+    ap.add_argument("--experiment-path", "--input", dest="input", required=True)
+    ap.add_argument("--output", dest="output", required=True)
     return ap
 
 
@@ -65,7 +65,7 @@ def discretize_light(data):
 
 def geom_ld_annotations(data, ax):
 
-    values, accum = rle.get_rle(data["L"].values)
+    values, accum = imgstore.utils.rle.get_rle(data["L"].values)
 
     zts = []
     pos=[data.index[0]]
@@ -119,7 +119,9 @@ def main(args=None):
     env_data = store.get_extra_data(ignore_corrupt_chunks=True)
 
     env_data = clean_data(env_data)
-    env_data = discretize_light(env_data)
+    env_data = env_data.loc[env_data["frame_index"] > 0]
+    env_data = align_data_to_zt0(env_data, store_datetime_str)
+    lnv_data = discretize_light(env_data)
     env_data["t"] = env_data["ZT"] / 3600000
 
     fig = plt.figure(1, figsize=(5,5), dpi=90)
