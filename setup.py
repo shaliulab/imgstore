@@ -60,6 +60,7 @@ setup(
         'python-dateutil',
         'gitpython',
         'shapely>=1.7.1',
+        'descartes',
     ],
     tests_require=[
         'pytest',
