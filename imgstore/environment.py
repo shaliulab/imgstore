@@ -7,6 +7,7 @@ import os.path
 import imgstore.utils.rle
 import datetime
 
+import pandas as pd
 import imgstore
 from shapely.geometry import Polygon
 from descartes import PolygonPatch
@@ -19,8 +20,9 @@ import matplotlib.pyplot as plt
 def get_parser():
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--experiment-path", "--input", dest="input", required=True)
-    ap.add_argument("--output", dest="output", required=True)
+    group = ap.add_mutually_exclusive_group(required=True)
+    group.add_argument("--experiment-path", "--input", dest="input")
+    group.add_argument("--environment-csv", dest="environment_csv")
     return ap
 
 
@@ -114,20 +116,35 @@ def main(args=None):
         ap = get_parser()
         args = ap.parse_args()
 
-    store_datetime_str =os.path.basename(args.input.strip("/"))
-    store=imgstore.new_for_filename(args.input)
-    env_data = store.get_extra_data(ignore_corrupt_chunks=True)
+    if args.input:
 
-    env_data = clean_data(env_data)
-    env_data = env_data.loc[env_data["frame_index"] > 0]
-    env_data = align_data_to_zt0(env_data, store_datetime_str)
-    lnv_data = discretize_light(env_data)
-    env_data["t"] = env_data["ZT"] / 3600000
+        store_datetime_str =os.path.basename(args.input.strip("/"))
+        store=imgstore.new_for_filename(args.input)
+        env_data = store.get_extra_data(ignore_corrupt_chunks=True)
+
+        env_data = clean_data(env_data)
+        env_data = env_data.loc[env_data["frame_index"] > 0]
+        env_data = align_data_to_zt0(env_data, store_datetime_str)
+        env_data = discretize_light(env_data)
+        env_data["t"] = env_data["ZT"] / 3600000
+        title = store_datetime_str
+        output_folder = args.input
+        prefix =  os.path.basename(args.input.strip("/"))
+
+    elif args.environment_data:
+        env_data = pd.read_csv(args.environment_csv, index_col=0)
+        title = os.path.basename(args.environment_csv)
+        output_folder = os.path.dirname(args.environment_csv)
+        prefix =  os.path.basename(args.environment_csv.split(".")[0])
+
 
     fig = plt.figure(1, figsize=(5,5), dpi=90)
     ax = fig.add_subplot(111)
     ax = geom_ld_annotations(env_data, ax)
-    ax.set_title(store_datetime_str)
+    ax.set_title(title)
     geom_env_data(env_data, ax)
     plt.tight_layout()
-    fig.savefig(args.output)
+    if args.input:
+        env_data.to_csv(os.path.join(output_folder, f"{prefix}_environment.csv"))
+    
+    fig.savefig(os.path.join(output_folder, f"{prefix}_environment.png"))
