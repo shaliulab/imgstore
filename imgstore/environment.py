@@ -135,7 +135,7 @@ def main(args=None):
         env_data = pd.read_csv(args.environment_csv, index_col=0)
         title = os.path.basename(args.environment_csv)
         output_folder = os.path.dirname(args.environment_csv)
-        prefix =  os.path.basename(args.environment_csv.split(".")[0])
+        prefix =  os.path.basename(args.environment_csv.split(".")[0]).replace("_environment", "")
 
 
     fig = plt.figure(1, figsize=(5,5), dpi=90)
