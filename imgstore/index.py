@@ -148,7 +148,7 @@ class ImgStoreIndex(object):
         md = {v: [] for v in var_names}
         for row in cur:
             for i, v in enumerate(var_names):
-                md[v] = append(row[i])
+                md[v].append(row[i])
         return md
 
     @property
