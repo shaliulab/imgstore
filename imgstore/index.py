@@ -182,7 +182,7 @@ class ImgStoreIndex(object):
             cur.execute("SELECT frame_time FROM frames WHERE frame_idx = ? ORDER BY rowid;", (frame_idx, ))
         elif not frame_number is None and frame_idx is None:
             cur.execute("SELECT frame_time FROM frames WHERE frame_number = ? ORDER BY rowid;", (frame_number, ))
-        return self._get_metadata(cur, ["frame_time"])
+        return self._get_metadata(cur, ["frame_time"])["frame_time"][0]
 
 
     def get_chunk_interval(self, chunk_n, metavar="frame_time"):
