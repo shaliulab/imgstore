@@ -144,11 +144,11 @@ class ImgStoreIndex(object):
         return cls(db)
 
     @staticmethod
-    def _get_metadata(cur):
-        md = {'frame_number': [], 'frame_time': []}
+    def _get_metadata(cur, var_names):
+        md = {v: [] for v in var_names}
         for row in cur:
-            md['frame_number'].append(row[0])
-            md['frame_time'].append(row[1])
+            for i, v in enumerate(var_names):
+                md[v] = append(row[i])
         return md
 
     @property
@@ -169,12 +169,21 @@ class ImgStoreIndex(object):
     def get_all_metadata(self):
         cur = self._conn.cursor()
         cur.execute("SELECT frame_number, frame_time FROM frames ORDER BY rowid;")
-        return self._get_metadata(cur)
+        return self._get_metadata(cur, ["frame_number", "frame_time"])
 
     def get_chunk_metadata(self, chunk_n):
         cur = self._conn.cursor()
         cur.execute("SELECT frame_number, frame_time FROM frames WHERE chunk = ? ORDER BY rowid;", (chunk_n, ))
-        return self._get_metadata(cur)
+        return self._get_metadata(cur, ["frame_number", "frame_time"])
+
+    def get_frame_time(self, frame_number=None, frame_idx=None):
+        cur = self._conn.cursor()
+        if frame_number is None and not frame_idx is None:
+            cur.execute("SELECT frame_time FROM frames WHERE frame_idx = ? ORDER BY rowid;", (frame_idx, ))
+        elif not frame_number is None and frame_idx is None:
+            cur.execute("SELECT frame_time FROM frames WHERE frame_number = ? ORDER BY rowid;", (frame_number, ))
+        return self._get_metadata(cur, ["frame_time"])
+
 
     def get_chunk_interval(self, chunk_n, metavar="frame_time"):
         """
