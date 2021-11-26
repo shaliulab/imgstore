@@ -265,7 +265,8 @@ class _ImgStore(object):
         self._created_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
         self._timezone_local = tzlocal.get_localzone()
 
-        store_md = {'imgshape': write_imgshape,
+        store_md = {'framerate': self._fps,
+                    'imgshape': write_imgshape,
                     'imgdtype': self._imgdtype,
                     'chunksize': chunksize,
                     'format': fmt,
@@ -1259,8 +1260,6 @@ def new_for_filename(path, **kwargs):
 def new_for_format(fmt, path=None, **kwargs):
     if 'mode' not in kwargs:
         kwargs['mode'] = 'w'
-
-    
 
     if kwargs.get('mode') == 'r':
         return new_for_filename(path, **kwargs)
