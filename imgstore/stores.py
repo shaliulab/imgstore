@@ -87,6 +87,7 @@ class _ImgStore(object):
         self.frame_max = np.nan
         self.frame_number = np.nan
         self.frame_count = 0
+        self.frame_in_chunk = 0
         self.frame_time = np.nan
 
         # noinspection PyClassHasNoInit
@@ -278,6 +279,12 @@ class _ImgStore(object):
                     'timezone_local': str(self._timezone_local),
                     'uuid': self._uuid}
 
+        # this is the place where any kwargs
+        # passed to imgstore.new_for_filename
+        # and not used by imgstore
+        # are saved
+        # this feature is super useful to add documentation or metadata
+        # about the experiment
         store_md.update(kwargs)
 
         if metadata is None:
@@ -317,9 +324,10 @@ class _ImgStore(object):
         self._chunk_md = {k: [] for k in _ImgStore.FRAME_MD}
         self._chunk_md.update(self._metadata)
 
-    def _save_image_metadata(self, frame_number, frame_time):
+    def _save_image_metadata(self, frame_number, frame_time, frame_in_chunk):
         self._chunk_md['frame_number'].append(frame_number)
         self._chunk_md['frame_time'].append(frame_time)
+        self._chunk_md['frame_in_chunk'].append(frame_in_chunk)
 
     # noinspection PyShadowingBuiltins,PyMethodMayBeStatic
     def _calculate_written_image_shape(self, imgshape, fmt):
@@ -471,6 +479,7 @@ class _ImgStore(object):
         data['frame_time'] = self.frame_time
         data['frame_number'] = self.frame_number
         data['frame_index'] = self._frame_n - 1  # we post-increment in add_frame
+        data['frame_in_chunk'] = self.frame_in_chunk  - 1
 
         # noinspection PyBroadException
         try:
@@ -577,7 +586,8 @@ class _ImgStore(object):
 
     def add_image(self, img, frame_number, frame_time):
         frame = self._encode_image(img)
-        self._save_image(frame, frame_number, frame_time)
+        self.frame_in_chunk += 1
+        self._save_image(frame, frame_number, frame_time, self.frame_in_chunk-1)
 
         self.frame_max = np.nanmax((frame_number, self.frame_max))
         self.frame_min = np.nanmin((frame_number, self.frame_min))
@@ -594,6 +604,7 @@ class _ImgStore(object):
             new = self._chunk_n + 1
             self._save_chunk(old, new)
             self._chunk_n = new
+            self.frame_in_chunk = 0
 
         self.frame_count = self._frame_n
 
@@ -1059,12 +1070,12 @@ class VideoImgStore(_ImgStore, ImgStoreExport):
             chunk_numbers = list(map(int, map(operator.itemgetter(0), map(lambda x: x.split("."), avis))))
         return list(zip(chunk_numbers, tuple(os.path.join(self._basedir, '%06d' % n) for n in chunk_numbers)))
 
-    def _save_image(self, img, frame_number, frame_time):
+    def _save_image(self, img, frame_number, frame_time, frame_in_chunk):
         # we always write color because its more supported
         self._cap.write(img)
         if not os.path.isfile(self._capfn):
             raise Exception('Your opencv build does support writing this codec')
-        self._save_image_metadata(frame_number, frame_time)
+        self._save_image_metadata(frame_number, frame_time, frame_in_chunk)
 
     def _save_chunk(self, old, new):
         if self._cap is not None:

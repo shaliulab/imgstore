@@ -16,5 +16,5 @@ STORE_INDEX_FILENAME = '.index.sqlite'
 
 EXTRA_DATA_FILE_EXTENSIONS = ('.extra.json', '.extra_data.json', '.extra_data.h5')
 
-FRAME_MD = ('frame_number', 'frame_time')
+FRAME_MD = ('frame_number', 'frame_time', 'frame_in_chunk')
 
