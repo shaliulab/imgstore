@@ -673,12 +673,12 @@ class _ImgStore(object):
         return self._get_image(chunk_n, frame_idx)
 
     
-    def _get_image_by_time(self, frame_time, exact_only):
+    def _get_image_by_time(self, frame_time, exact_only=False):
 
         if exact_only:
             chunk_n, frame_idx = self._index.find_chunk('frame_time', frame_time)
         else:
-            return None
+            chunk_n, frame_idx = self._index.find_chunk_nearest('frame_time', frame_time)
         
         if chunk_n == -1:
             raise ValueError('timestamp #%s not found in any chunk' % frame_time)
