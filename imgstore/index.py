@@ -27,7 +27,7 @@ def _load_index(path_without_extension):
                         try:
                             data[k] = dat[k].tolist()
                         except KeyError:
-                            log.warning(f"{k} is not available in this dataset")
+                            log.info(f"{k} is not available in this dataset")
 
                     return data
 
