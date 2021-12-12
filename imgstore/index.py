@@ -9,7 +9,8 @@ import numpy as np
 from .constants import FRAME_MD
 
 
-log = logging.getLogger('imgstore.index')
+log = logging.getLogger("imgstore.index")
+
 
 def _load_index(path_without_extension):
     for extension in (".npz", ".yaml"):

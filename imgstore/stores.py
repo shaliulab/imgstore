@@ -70,8 +70,21 @@ class _ImgStore(object):
     FRAME_MD = _FRAME_MD
 
     # noinspection PyShadowingBuiltins
-    def __init__(self, basedir, mode, imgshape=None, imgdtype=np.uint8, chunksize=None, metadata=None,
-                 encoding=None, write_encode_encoding=None, format=None, index=None, chunk_numbers=None, **kwargs):
+    def __init__(
+        self,
+        basedir,
+        mode,
+        imgshape=None,
+        imgdtype=np.uint8,
+        chunksize=None,
+        metadata=None,
+        encoding=None,
+        write_encode_encoding=None,
+        format=None,
+        index=None,
+        chunk_numbers=None,
+        **kwargs
+    ):
         if mode not in self._supported_modes:
             raise ValueError("mode not supported")
 
@@ -152,10 +165,17 @@ class _ImgStore(object):
                 # as we need to read the chunks, populate the chunk cache now too (could be an expensive operation
                 # if there are thousands of chunks)
                 t0 = time.time()
-                self._chunk_n_and_chunk_paths = self._find_chunks(chunk_numbers=chunk_numbers)
-                self._log.debug('found %s chunks in in %fs' % (len(self._chunk_n_and_chunk_paths), time.time() - t0))
+                self._chunk_n_and_chunk_paths = self._find_chunks(
+                    chunk_numbers=chunk_numbers
+                )
+                self._log.debug(
+                    "found %s chunks in in %fs"
+                    % (len(self._chunk_n_and_chunk_paths), time.time() - t0)
+                )
 
-                self._index = ImgStoreIndex.new_from_chunks(self._chunk_n_and_chunk_paths)
+                self._index = ImgStoreIndex.new_from_chunks(
+                    self._chunk_n_and_chunk_paths
+                )
             elif (index is not None) and isinstance(index, ImgStoreIndex):
                 self._log.debug("using supplied index")
                 self._index = index
