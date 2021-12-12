@@ -9,6 +9,8 @@ import numpy as np
 from .constants import FRAME_MD
 
 
+log = logging.getLogger('imgstore.index')
+
 def _load_index(path_without_extension):
     for extension in (".npz", ".yaml"):
         path = path_without_extension + extension
@@ -20,7 +22,14 @@ def _load_index(path_without_extension):
             elif extension == ".npz":
                 with open(path, "rb") as f:
                     dat = np.load(f)
-                    return {k: dat[k].tolist() for k in FRAME_MD}
+                    data = {}
+                    for k in FRAME_MD:
+                        try:
+                            data[k] = dat[k].tolist()
+                        except KeyError:
+                            log.info(f"{k} is not available in this dataset")
+
+                    return data
 
     raise IOError("could not find index %s" % path_without_extension)
 
@@ -30,7 +39,7 @@ class ImgStoreIndex(object):
 
     VERSION = "1"
 
-    log = logging.getLogger("imgstore.index")
+    log = log
 
     def __init__(self, db=None):
         self._conn = db
