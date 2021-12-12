@@ -1,6 +1,7 @@
 from .stores import (
     new_for_filename,
     new_for_format,
+    read_metadata,
     extract_only_frame,
     get_supported_formats,
     VideoImgStore,
