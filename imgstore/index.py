@@ -21,7 +21,7 @@ def _load_index(path_without_extension):
                     return {k: dat[k] for k in FRAME_MD}
             elif extension == '.npz':
                 with open(path, 'rb') as f:
-                    dat = np.load(f)
+                    dat = np.load(f, allow_pickle=True)
                     data = {}
                     for k in FRAME_MD:
                         try:
@@ -30,6 +30,8 @@ def _load_index(path_without_extension):
                             log.info(f"{k} is not available in this dataset")
 
                     return data
+        else:
+            log.warning(f"{path} is missing")
 
     raise IOError('could not find index %s' % path_without_extension)
 
