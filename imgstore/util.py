@@ -8,7 +8,7 @@ import json
 import numpy as np
 
 
-if cv2.__version__.startswith(('3.', '4.')):
+if cv2.__version__.startswith(("3.", "4.")):
     FourCC = cv2.VideoWriter_fourcc
 else:
     # noinspection PyUnresolvedReferences
@@ -52,7 +52,9 @@ class ImageCodecProcessor(object):
     """
 
     # https://regex101.com/r/pL2mY2/1
-    CV2_CODEC_RE = re.compile("^COLOR_(?P<codec>[A-Za-z0-9_]+)2BGR($|(?P<method>_[A-Za-z0-9]*))")
+    CV2_CODEC_RE = re.compile(
+        "^COLOR_(?P<codec>[A-Za-z0-9_]+)2BGR($|(?P<method>_[A-Za-z0-9]*))"
+    )
 
     def __init__(self):
         self._default_code = None
@@ -69,18 +71,18 @@ class ImageCodecProcessor(object):
                 self.__cv2_enum_to_name[enum].append(name)
 
                 parts = m.groupdict()
-                code = 'cv_%s' % parts['codec'].lower().replace('_', '')
+                code = "cv_%s" % parts["codec"].lower().replace("_", "")
 
-                meth = parts.get('method', None)
+                meth = parts.get("method", None)
                 if meth:
-                    if 'bayer' in code:
+                    if "bayer" in code:
                         # cv includes different bayer methods, ignore them
                         continue
-                    elif meth == 'full':
+                    elif meth == "full":
                         # fixme: not sure what this is
                         continue
 
-                    code += '_%s' % parts['method'].lower().replace('_', '')
+                    code += "_%s" % parts["method"].lower().replace("_", "")
 
                 self._cv2_code_to_enum[code] = enum
                 self._cv2_enum_to_code[enum] = code
@@ -93,16 +95,16 @@ class ImageCodecProcessor(object):
     @classmethod
     def from_pylon_format(cls, s):
         # pylon disagrees with opencv (B & R are always switched)
-        if s in {'BayerBG', 'Bayer_BG'}:
-            code = 'cv_bayerrg'
-        elif s in {'BayerRG', 'Bayer_RG'}:
-            code = 'cv_bayerbg'
-        elif s in {'BayerGB', 'Bayer_GB'}:
-            code = 'cv_bayergr'
-        elif (not s) or (s == 'None'):
+        if s in {"BayerBG", "Bayer_BG"}:
+            code = "cv_bayerrg"
+        elif s in {"BayerRG", "Bayer_RG"}:
+            code = "cv_bayerbg"
+        elif s in {"BayerGB", "Bayer_GB"}:
+            code = "cv_bayergr"
+        elif (not s) or (s == "None"):
             code = None
         else:
-            raise ValueError('unknown pylon format: %r' % s)
+            raise ValueError("unknown pylon format: %r" % s)
 
         obj = cls()
         obj.set_default_code(code)
@@ -116,7 +118,7 @@ class ImageCodecProcessor(object):
 
     @property
     def encoding(self):
-        return self._default_code or ''
+        return self._default_code or ""
 
     def _autodecode_cvtcolor(self, img):
         return cv2.cvtColor(img, self._default_enum)
@@ -128,7 +130,7 @@ class ImageCodecProcessor(object):
             self.autoconvert = lambda x: x
         else:
             if not self.check_code(code):
-                raise ValueError('unknown image encoding:' % code)
+                raise ValueError("unknown image encoding:" % code)
             self._default_code = code
             self._default_enum = self._cv2_code_to_enum[code]
             self.autoconvert = self._autodecode_cvtcolor
@@ -145,7 +147,7 @@ class ImageCodecProcessor(object):
         if method_enum is None:
             method_enum = self._cv2_code_to_enum[code]
         if code is None:
-            raise ValueError('encoding must be specified')
+            raise ValueError("encoding must be specified")
         return cv2.cvtColor(img, method_enum)
 
 
@@ -169,19 +171,19 @@ class JsonCustomEncoder(json.JSONEncoder):
 def motif_extra_data_json_to_df(store, path):
     import pandas as pd
 
-    with open(path, 'rt') as f:
+    with open(path, "rt") as f:
         records = json.load(f)
         df = pd.DataFrame(records)
 
         if not df.empty:
-            df = df[df['frame_number'] >= 0]
+            df = df[df["frame_number"] >= 0]
 
         if not df.empty:
 
-            if 'sensor_time' in df.columns:
-                by = ['frame_index','sensor_time']
+            if "sensor_time" in df.columns:
+                by = ["frame_index", "sensor_time"]
             else:
-                by = ['frame_index']
+                by = ["frame_index"]
 
             try:
                 return df.sort_values(by=by, ignore_index=True)
@@ -191,15 +193,19 @@ def motif_extra_data_json_to_df(store, path):
 
 def motif_get_parse_true_fps(store, default=25.0, hwardware_only=False):
     md = store.user_metadata
-    if 'hwframerate' in md:
-        return float(md['hwframerate'])
-    elif 'motifptpframerate' in md:
-        return float(md['motifptpframerate'])
-    elif (not hwardware_only) and \
-            (md.get('acquisitionframerate') and (md.get('acquisitionframerateenable', False) is True)):
-        return float(md['acquisitionframerate'])
+    if "hwframerate" in md:
+        return float(md["hwframerate"])
+    elif "motifptpframerate" in md:
+        return float(md["motifptpframerate"])
+    elif (not hwardware_only) and (
+        md.get("acquisitionframerate")
+        and (md.get("acquisitionframerateenable", False) is True)
+    ):
+        return float(md["acquisitionframerate"])
     elif default is None:
-        return 1.0 / np.median(np.diff(store._get_chunk_metadata(0)['frame_time']))
+        return 1.0 / np.median(
+            np.diff(store._get_chunk_metadata(0)["frame_time"])
+        )
     return default
 
 
@@ -207,8 +213,10 @@ def motif_extra_data_h5_attrs(path):
     import h5py
 
     attrs = {}
-    with h5py.File(path, 'r') as f:
-        attrs['_datasets'] = [s.strip() for s in f.attrs['datasets'].decode('ascii').split(',')]
+    with h5py.File(path, "r") as f:
+        attrs["_datasets"] = [
+            s.strip() for s in f.attrs["datasets"].decode("ascii").split(",")
+        ]
         for g in f.keys():
             attrs[g] = dict(f[g].attrs)
 
@@ -221,27 +229,32 @@ def motif_extra_data_h5_to_df(store, path):
 
     def _attr_string(_s):
         try:
-            return _s.decode('ascii')
+            return _s.decode("ascii")
         except AttributeError:
             return _s
 
-    with h5py.File(path, 'r') as f:
+    with h5py.File(path, "r") as f:
         dat = {}
 
         # the camera information is stored in an array with compound datatype
-        camera = np.asarray(f['camera'])
+        camera = np.asarray(f["camera"])
 
         # recording can be stopped before chunk is full, so trim away rows in the store that
         # were pre-allocated, but not recorded. pre-allocated but un-used frames are indicated with
         # a framenumber < 0
-        mask = camera['frame_number'] >= 0
+        mask = camera["frame_number"] >= 0
 
         # motif stores the names of datasets in a root attribute
-        datasets = [s.strip() for s in _attr_string(f.attrs['datasets']).split(',')]
+        datasets = [
+            s.strip() for s in _attr_string(f.attrs["datasets"]).split(",")
+        ]
 
         for dsname in datasets:
             ds = f[dsname]
-            col_names = [s.strip() for s in _attr_string(ds.attrs['column_names']).split(',')]
+            col_names = [
+                s.strip()
+                for s in _attr_string(ds.attrs["column_names"]).split(",")
+            ]
 
             # trim the array
             arr = ds[..., mask]
@@ -256,6 +269,6 @@ def motif_extra_data_h5_to_df(store, path):
             dat[cam_md_name] = camera[cam_md_name][mask]
 
         # and the sample delays
-        dat['sample_delay'] = np.asarray(f['sample_delay'])[mask]
+        dat["sample_delay"] = np.asarray(f["sample_delay"])[mask]
 
         return pd.DataFrame(dat)
