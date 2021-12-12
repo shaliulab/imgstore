@@ -4,15 +4,26 @@ import tqdm
 import pandas as pd
 import cv2
 
-class ImgStoreExport:
 
-    def to_videofile(self, output, framerate=None, frame_number: Iterable = None, frame_time: Iterable = None, roi: tuple =None):
+class ImgStoreExport:
+    def to_videofile(
+        self,
+        output,
+        framerate=None,
+        frame_number: Iterable = None,
+        frame_time: Iterable = None,
+        roi: tuple = None,
+    ):
 
         if frame_number is None and frame_time is None:
-            raise Exception("Please pass an interval of frame indices or timestamps")
-        
+            raise Exception(
+                "Please pass an interval of frame indices or timestamps"
+            )
+
         elif not frame_number is None and not frame_time is None:
-            raise Exception("Please pass an interval of frame indices or timestamps but only one of them")
+            raise Exception(
+                "Please pass an interval of frame indices or timestamps but only one of them"
+            )
 
         elif frame_number is None and not frame_time is None:
             metadata_df = []
@@ -26,9 +37,14 @@ class ImgStoreExport:
 
             frame_number = []
             for t in frame_time:
-                frame_number.append(int(metadata_df.loc[metadata_df["frame_time"] == t]["frame_number"].values[0]))
-            
-        
+                frame_number.append(
+                    int(
+                        metadata_df.loc[metadata_df["frame_time"] == t][
+                            "frame_number"
+                        ].values[0]
+                    )
+                )
+
         # for readability
         else:
             pass
@@ -39,7 +55,7 @@ class ImgStoreExport:
         frame_number = tuple(frame_number)
 
         frame_indices = list(range(*frame_number))
-        
+
         if framerate is None:
             framerate = self._fps
 
@@ -59,25 +75,23 @@ class ImgStoreExport:
         else:
             fmts = [e.split("/")[1] for e in self._cv2_fmts.keys() if "/" in e]
             fmts = " ".join(fmts)
-            key=[k for k in self._cv2_fmts.keys() if extension in k]
+            key = [k for k in self._cv2_fmts.keys() if extension in k]
 
             if len(key) == 0:
-                raise Exception("""
+                raise Exception(
+                    """
                 No encoder available for this format.
                 Supported formats are
-                """ + fmts)
-            
-            key=key[0]
+                """
+                    + fmts
+                )
+
+            key = key[0]
             # import ipdb; ipdb.set_trace()
             encoder = self._cv2_fmts[key]
 
-            
         video_writer = cv2.VideoWriter(
-            output,
-            encoder,
-            framerate,
-            resolution,
-            isColor=isColor
+            output, encoder, framerate, resolution, isColor=isColor
         )
 
         # import ipdb; ipdb.set_trace()
@@ -88,10 +102,8 @@ class ImgStoreExport:
 
             if not roi is None:
                 x, y, width, height = roi
-                video_writer.write(img[y:(y+height), x:(x+width)])
+                video_writer.write(img[y : (y + height), x : (x + width)])
             else:
                 video_writer.write(img)
 
-
         video_writer.release()
-    

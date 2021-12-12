@@ -7,9 +7,9 @@ import numpy as np
 
 
 class StoreAligner(object):
-    MISSING_POLICY_DROP = 'drop'
-    MISSING_POLICY_HOLD = 'zoh'
-    MISSING_POLICY_BLACK = 'black'
+    MISSING_POLICY_DROP = "drop"
+    MISSING_POLICY_HOLD = "zoh"
+    MISSING_POLICY_BLACK = "black"
 
     def __init__(self, *stores):
         self._fns = []
@@ -20,15 +20,21 @@ class StoreAligner(object):
         self._store_shape = sizes.pop()
 
     def extract_common_frames(self, policy):
-        assert policy in (StoreAligner.MISSING_POLICY_DROP,
-                          StoreAligner.MISSING_POLICY_HOLD,
-                          StoreAligner.MISSING_POLICY_BLACK)
+        assert policy in (
+            StoreAligner.MISSING_POLICY_DROP,
+            StoreAligner.MISSING_POLICY_HOLD,
+            StoreAligner.MISSING_POLICY_BLACK,
+        )
 
-        fns_arr = [s.get_frame_metadata()['frame_number'] for s in self._stores]
+        fns_arr = [
+            s.get_frame_metadata()["frame_number"] for s in self._stores
+        ]
         if self._missing_policy == StoreAligner.MISSING_POLICY_DROP:
             self._fns = functools.reduce(np.intersect1d, fns_arr)
         else:
-            fns_all = np.fromiter(itertools.chain.from_iterable(fns_arr), dtype=int)
+            fns_all = np.fromiter(
+                itertools.chain.from_iterable(fns_arr), dtype=int
+            )
             self._fns = np.unique(fns_all)
 
         self._missing_policy = policy
@@ -46,18 +52,29 @@ class StoreAligner(object):
             ts = []
             for i, store in enumerate(self._stores):
                 try:
-                    img, (_, t) = store.get_image(frame_number=fn, exact_only=True)
+                    img, (_, t) = store.get_image(
+                        frame_number=fn, exact_only=True
+                    )
                     last_imgs[i] = img
                     imgs.append(img)
                     ts.append(t)
                 except ValueError:
-                    print('store %d missing frame %s' % (i, fn))
+                    print("store %d missing frame %s" % (i, fn))
                     ts.append(np.nan)
-                    if self._missing_policy == StoreAligner.MISSING_POLICY_HOLD:
+                    if (
+                        self._missing_policy
+                        == StoreAligner.MISSING_POLICY_HOLD
+                    ):
                         imgs.append(last_imgs[i])
-                    elif self._missing_policy == StoreAligner.MISSING_POLICY_BLACK:
+                    elif (
+                        self._missing_policy
+                        == StoreAligner.MISSING_POLICY_BLACK
+                    ):
                         imgs.append(black_img)
-                    elif self._missing_policy == StoreAligner.MISSING_POLICY_DROP:
+                    elif (
+                        self._missing_policy
+                        == StoreAligner.MISSING_POLICY_DROP
+                    ):
                         continue
                     else:
                         raise NotImplementedError

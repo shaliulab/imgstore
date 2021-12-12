@@ -9,9 +9,9 @@ import cv2
 import numpy as np
 
 _SCREEN_RESOLUTION = None
-_IS_MAC = sys.platform == 'darwin'
+_IS_MAC = sys.platform == "darwin"
 
-_log = logging.getLogger('imgstore.ui')
+_log = logging.getLogger("imgstore.ui")
 
 
 class _Window(object):
@@ -22,16 +22,20 @@ class _Window(object):
         self._set = False
 
     def __repr__(self):
-        return "Window<'%s', flags=%s, sizestr=%s, mac=%s>" % (self.name, bin(self._flags),
-                                                               self._size, _IS_MAC)
+        return "Window<'%s', flags=%s, sizestr=%s, mac=%s>" % (
+            self.name,
+            bin(self._flags),
+            self._size,
+            _IS_MAC,
+        )
 
     def __str__(self):
         return self.name
 
     @property
     def size(self):
-        if 'x' in self._size:
-            return tuple(map(int, self._size.split('x')))
+        if "x" in self._size:
+            return tuple(map(int, self._size.split("x")))
         return None
 
     def imshow(self, *args, **kwargs):
@@ -56,20 +60,22 @@ def get_screen_resolution():
     global _SCREEN_RESOLUTION
 
     if _SCREEN_RESOLUTION is None:
-        resolution = ''
+        resolution = ""
 
         try:
             if _IS_MAC:
                 _re = re.compile(r"""^.*Resolution:\s*([\d\sx]+)""")
-                out = subprocess.check_output(['system_profiler', 'SPDisplaysDataType'])
+                out = subprocess.check_output(
+                    ["system_profiler", "SPDisplaysDataType"]
+                )
                 for l in out.splitlines():
-                    _s = l.decode('utf-8')
+                    _s = l.decode("utf-8")
                     m = _re.match(_s)
                     if m:
                         resolution = m.groups()[0]
             else:
-                out = subprocess.check_output(['xrandr'])
-                resolution_line = [l for l in out.splitlines() if '*' in l][0]
+                out = subprocess.check_output(["xrandr"])
+                resolution_line = [l for l in out.splitlines() if "*" in l][0]
                 resolution = resolution_line.split()[0]
         except subprocess.CalledProcessError as exc:
             _log.warn("could not detect resolution: %r:" % exc)
@@ -87,7 +93,7 @@ def get_and_parse_screen_resolution(scale=1.0, default=(1024, 768)):
 
     if res:
         try:
-            _w, _h = map(float, res.split('x'))
+            _w, _h = map(float, res.split("x"))
         except ValueError:
             _log.warn("could not splitting resolution string: %r:" % res)
     else:
@@ -98,7 +104,9 @@ def get_and_parse_screen_resolution(scale=1.0, default=(1024, 768)):
     return int(w), int(h)
 
 
-def new_window(name, size=None, expanded_ui=True, shape=None, screen_relative_size=0.75):
+def new_window(
+    name, size=None, expanded_ui=True, shape=None, screen_relative_size=0.75
+):
     if shape is not None:
         size = shape[1], shape[0]
 
@@ -110,7 +118,9 @@ def new_window(name, size=None, expanded_ui=True, shape=None, screen_relative_si
         if (size[0] > 0) and (not np.isnan(size[0])):
 
             # create a resizable window but limit its size to 75% the screen size
-            sw, sh = get_and_parse_screen_resolution(scale=screen_relative_size, default=(1024, 768))
+            sw, sh = get_and_parse_screen_resolution(
+                scale=screen_relative_size, default=(1024, 768)
+            )
 
             if np.isinf(size[0]):
                 w = sw
@@ -127,13 +137,13 @@ def new_window(name, size=None, expanded_ui=True, shape=None, screen_relative_si
                 w *= sf
 
             cv2.resizeWindow(name, int(w), int(h))
-            sizestr = '%dx%d' % (int(w), int(h))
+            sizestr = "%dx%d" % (int(w), int(h))
         else:
-            sizestr = 'unknown'
+            sizestr = "unknown"
     else:
         flags = cv2.WINDOW_AUTOSIZE | flags
         cv2.namedWindow(name, flags)
-        sizestr = 'auto'
+        sizestr = "auto"
 
     win = _Window(name, flags, sizestr)
     return win
