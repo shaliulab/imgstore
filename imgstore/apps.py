@@ -7,7 +7,6 @@ import numpy as np
 from .stores import new_for_filename, get_supported_formats, new_for_format
 from .ui import new_window
 from .util import motif_get_parse_true_fps
-from .environment import main as main_sensor
 
 _log = logging.getLogger("imgstore.apps")
 

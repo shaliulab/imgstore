@@ -221,7 +221,7 @@ class _ImgStore(object):
 
     def _init_read(self):
         fullpath = os.path.join(self._basedir, STORE_MD_FILENAME)
-        allmd, smd = self._init_read(fullpath)
+        allmd, smd = self.read_metadata(fullpath)
 
         self._metadata = smd
         self._user_metadata.update(allmd)
@@ -1516,6 +1516,11 @@ def _parse_basedir_fullpath(path, basedir, read):
         )
 
     return basedir, fullpath
+
+
+def read_metadata(basedir):
+    fullpath = os.path.join(basedir, STORE_MD_FILENAME)
+    return _ImgStore.read_metadata(fullpath)
 
 
 def new_for_filename(path, **kwargs):
