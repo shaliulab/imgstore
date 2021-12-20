@@ -189,10 +189,23 @@ class _ImgStore(object):
             self.frame_max = self._index.frame_max
 
             # reset to the start of the file and load the first chunk
-            self._load_chunk(0)
-            assert self._chunk_current_frame_idx == -1
-            assert self._chunk_n == 0
+            self.reset_to_first_frame()
             self.frame_number = np.nan  # we haven't read any frames yet
+
+    def reset_to_first_frame(self):
+        chunk = 0
+        while True:
+            try:
+                self._load_chunk(chunk)
+                break
+            except Exception:
+                self._log.warning(f"Cant open video for chunk {chunk}")
+                chunk += 1
+        
+        chunk_current_frame_idx = -1
+        assert self._chunk_current_frame_idx == chunk_current_frame_idx
+        assert self._chunk_n == chunk
+
 
     @classmethod
     def read_metadata(cls, fullpath):
