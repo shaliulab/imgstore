@@ -48,6 +48,8 @@ from .util import (
 from .index import ImgStoreIndex
 from .export import ImgStoreExport
 
+from .compat import CV2Compat
+
 _VERBOSE_DEBUG_GETS = False
 _VERBOSE_DEBUG_CHUNKS = False
 _VERBOSE_VERY = False  # overrides the other and prints all logs to stdout
@@ -63,7 +65,7 @@ def _extract_store_metadata(full_path):
 # whereas frame_index refers to the global frame_index from (0, frame_count]
 
 
-class _ImgStore(object):
+class _ImgStore(CV2Compat):
     _version = 2
     _supported_modes = ""
 
