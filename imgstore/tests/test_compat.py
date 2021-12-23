@@ -18,6 +18,7 @@ from cv2 import (
 
 STORE_PATH = os.path.join(TEST_DATA_DIR, "imgstore_1", "metadata.yaml")
 
+
 class TestCompat(unittest.TestCase):
 
     QUERY_FRAME_COUNT = 100
@@ -34,7 +35,6 @@ class TestCompat(unittest.TestCase):
         self.assertTrue(isinstance(img, np.ndarray))
         # Test store timestamp or frame number
 
-
     def test_get_resolution(self):
         """
         Test that width and height can be fetched
@@ -49,7 +49,6 @@ class TestCompat(unittest.TestCase):
         self.assertEqual(width, target_width)
         self.assertEqual(height, target_height)
 
-
     def test_get_pos(self):
         """
         Test that the position of the videos can be fetched
@@ -57,25 +56,17 @@ class TestCompat(unittest.TestCase):
 
         pos_msec = self._store.get(CAP_PROP_POS_MSEC)
         pos_frames = self._store.get(CAP_PROP_POS_FRAMES)
-        
+
         # next_frame_number = self._store.get_frame_metadata()["frame_number"][self.QUERY_FRAME_COUNT + 1]
         next_frame_number = self._store._chunk_current_frame_idx + 1
 
-        next_timestamp = self._store._get_chunk_metadata(
-            self._store._chunk_n
-        )[
+        next_timestamp = self._store._get_chunk_metadata(self._store._chunk_n)[
             "frame_time"
-        ][
-            self._store._chunk_current_frame_idx+1
-        ]
-        t0 = self._store._get_chunk_metadata(
-            self._store._chunk_n
-        )[
+        ][self._store._chunk_current_frame_idx + 1]
+        t0 = self._store._get_chunk_metadata(self._store._chunk_n)[
             "frame_time"
-        ][
-            0
-        ] 
-        next_timestamp -= t0       
+        ][0]
+        next_timestamp -= t0
 
         self.assertEqual(pos_msec, next_timestamp)
         self.assertEqual(pos_frames, next_frame_number)
@@ -83,12 +74,19 @@ class TestCompat(unittest.TestCase):
     def test_get_framecount(self):
 
         frame_count = self._store.get(CAP_PROP_FRAME_COUNT)
-        self.assertEqual(frame_count, len(self._store._get_chunk_metadata(
-            self._store._chunk_n
-        )["frame_number"]))
+        self.assertEqual(
+            frame_count,
+            len(
+                self._store._get_chunk_metadata(self._store._chunk_n)[
+                    "frame_number"
+                ]
+            ),
+        )
 
         pos_rel = self._store.get(CAP_PROP_POS_AVI_RATIO)
-        self.assertEqual(pos_rel, (self._store._chunk_current_frame_idx+1)/frame_count)
+        self.assertEqual(
+            pos_rel, (self._store._chunk_current_frame_idx + 1) / frame_count
+        )
 
     def test_get_fps(self):
         fps = self._store.get(CAP_PROP_FPS)
@@ -99,7 +97,6 @@ class TestCompat(unittest.TestCase):
         self.assertEqual(fps, framerate)
         self.assertEqual(fps, video_fps)
 
-
     def test_release(self):
 
         self._store.release()
@@ -108,4 +105,3 @@ class TestCompat(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -5,8 +5,8 @@ import numpy as np
 
 from .stores import new_for_filename, new_for_format
 
-class ImgStoreResizer:
 
+class ImgStoreResizer:
     def __init__(self, store_path):
         self._store = new_for_filename(store_path)
 
@@ -15,14 +15,16 @@ class ImgStoreResizer:
         kwargs = {
             "imgshape": self._store._metadata["imgshape"],
             "chunksize": self._store._metadata["chunksize"],
-            "framerate": self._store._metadata["framerate"]
+            "framerate": self._store._metadata["framerate"],
         }
 
         kwargs.update(user_kwargs)
 
         dest_store = new_for_format(fmt="mjpeg/avi", path=dest, **kwargs)
 
-        img, (frame_number_0, timestamp_0) = self._store._get_image_by_time(time_range[0])
+        img, (frame_number_0, timestamp_0) = self._store._get_image_by_time(
+            time_range[0]
+        )
 
         timestamp = timestamp_0
 
@@ -34,4 +36,3 @@ class ImgStoreResizer:
             dest_store.add_image(img, frame_number_dest, timestamp_dest)
 
         dest_store.close()
-

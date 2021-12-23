@@ -20,8 +20,8 @@ def _load_index(path_without_extension):
                 with open(path, "rt") as f:
                     dat = yaml.safe_load(f)
                     return {k: dat[k] for k in FRAME_MD}
-            elif extension == '.npz':
-                with open(path, 'rb') as f:
+            elif extension == ".npz":
+                with open(path, "rb") as f:
                     dat = np.load(f, allow_pickle=True)
                     data = {}
                     for k in FRAME_MD:
