@@ -1,4 +1,4 @@
-import json
+import os.path
 
 import cv2
 import numpy as np
@@ -24,6 +24,13 @@ class ImgStoreResizer:
         }
 
         kwargs.update(user_kwargs)
+
+        if dest.endswith("metadata.yaml"):
+            dir_dest = os.path.dirname(dest)
+        else:
+            dir_dest = dest
+
+        os.makedirs(dir_dest, exist_ok=False)
 
         self._dest = new_for_format(fmt="mjpeg/avi", path=dest, **kwargs)
 
