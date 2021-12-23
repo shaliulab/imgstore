@@ -1,7 +1,7 @@
 __store:
   chunksize: 75
   class: VideoImgStore
-  created_utc: '2021-12-23T08:50:50.046717'
+  created_utc: '2021-12-23T17:13:24.603540'
   encoding: null
   extension: .avi
   format: mjpeg/avi
@@ -11,5 +11,5 @@ __store:
   - 1498
   - 1514
   timezone_local: Etc/UTC
-  uuid: 5a413e1a8f6746a0804623ac29b4e36c
+  uuid: 4295f4a238874619b5171c4e2e5942b4
   version: 2
