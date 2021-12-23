@@ -22,11 +22,10 @@ class TestCompat(unittest.TestCase):
 
     QUERY_FRAME_COUNT = 100
 
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
         store = new_for_filename(STORE_PATH)
-        _ = store.get_image(cls.QUERY_FRAME_COUNT)
-        cls._store = store
+        _ = store.get_image(self.QUERY_FRAME_COUNT)
+        self._store = store
 
     def test_read(self):
         ret, img = self._store.read()
@@ -58,9 +57,25 @@ class TestCompat(unittest.TestCase):
 
         pos_msec = self._store.get(CAP_PROP_POS_MSEC)
         pos_frames = self._store.get(CAP_PROP_POS_FRAMES)
+        
+        # next_frame_number = self._store.get_frame_metadata()["frame_number"][self.QUERY_FRAME_COUNT + 1]
+        next_frame_number = self._store._chunk_current_frame_idx + 1
 
-        next_frame_number = self._store.get_frame_metadata()["frame_number"][self.QUERY_FRAME_COUNT + 1]
-        next_timestamp = self._store.get_frame_metadata()["frame_time"][self.QUERY_FRAME_COUNT + 1]
+        next_timestamp = self._store._get_chunk_metadata(
+            self._store._chunk_n
+        )[
+            "frame_time"
+        ][
+            self._store._chunk_current_frame_idx+1
+        ]
+        t0 = self._store._get_chunk_metadata(
+            self._store._chunk_n
+        )[
+            "frame_time"
+        ][
+            0
+        ] 
+        next_timestamp -= t0       
 
         self.assertEqual(pos_msec, next_timestamp)
         self.assertEqual(pos_frames, next_frame_number)
@@ -68,10 +83,12 @@ class TestCompat(unittest.TestCase):
     def test_get_framecount(self):
 
         frame_count = self._store.get(CAP_PROP_FRAME_COUNT)
-        self.assertEqual(frame_count, self._store.get_frame_metadata()["frame_number"][-1])
+        self.assertEqual(frame_count, len(self._store._get_chunk_metadata(
+            self._store._chunk_n
+        )["frame_number"]))
 
         pos_rel = self._store.get(CAP_PROP_POS_AVI_RATIO)
-        self.assertEqual(pos_rel, (self.QUERY_FRAME_COUNT + 1)/frame_count)
+        self.assertEqual(pos_rel, (self._store._chunk_current_frame_idx+1)/frame_count)
 
     def test_get_fps(self):
         fps = self._store.get(CAP_PROP_FPS)

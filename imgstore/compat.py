@@ -10,6 +10,9 @@ class CV2Compat:
     Give the imgstore classes an OpenCV-like API
     so they can be exchanged in place of the cv2.VideoCapture()
     without changing any depending code
+
+    Frame count and frame time are relative to the first frame of the chunk
+    If you want to refer them to the first frame of the whole imgstore, please pass absolute=True
     """
 
     def read(self):
@@ -66,7 +69,7 @@ class CV2Compat:
 
     def _get_posframes(self, absolute=False):
         _, (frame_number, _) = self.get_next_image()
-        _ = self.get_image(frame_number-1)
+        _ = self.get_image(max(0, frame_number-1))
 
         if absolute:
            posframes = frame_number
@@ -86,7 +89,7 @@ class CV2Compat:
         self._set_posmsec(timestamp, absolute=False)
 
     def _get_posrel(self):
-        posframes = self._getposframes()
+        posframes = self._get_posframes()
         framecount = self._get_framecount()
         posframes_rel = posframes / framecount
         return posframes_rel
