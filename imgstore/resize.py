@@ -5,12 +5,12 @@ import numpy as np
 
 from .stores import new_for_filename, new_for_format
 
-class ImgStoreSplitter:
+class ImgStoreResizer:
 
     def __init__(self, store_path):
         self._store = new_for_filename(store_path)
 
-    def split(self, time_range, dest, **user_kwargs):
+    def resize(self, time_range, dest, **user_kwargs):
 
         kwargs = {
             "imgshape": self._store._metadata["imgshape"],
