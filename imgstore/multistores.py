@@ -3,7 +3,8 @@ import cv2
 from cv2 import (
     CAP_PROP_FRAME_WIDTH,
     CAP_PROP_FRAME_HEIGHT,
-    CAP_PROP_FPS
+    CAP_PROP_POS_MSEC,
+    CAP_PROP_FPS,
 )
 
 from .stores import new_for_filename
@@ -13,7 +14,7 @@ class MultiStore:
 
     _LAYOUT = (2, 1)
 
-    def __init__(self, store_list, layout=None, adjust_by="pad", **kwargs):
+    def __init__(self, store_list, layout=None, adjust_by="resize", **kwargs):
 
         self._stores = {
             path: new_for_filename(path, **kwargs) for path in store_list
@@ -64,7 +65,7 @@ class MultiStore:
                 img = self._pad_img(img, width_diff)
 
             elif self._adjust_by == "resize":
-                img = self._resize_img()
+                img = self._resize_img(img, width_diff)
         
         assert img.shape[1] == width
         
@@ -72,8 +73,11 @@ class MultiStore:
 
     @staticmethod
     def _resize_img(img, width_diff):
+        
+        ratio = (img.shape[1] + width_diff) / img.shape[1]
+        
         img = cv2.resize(
-            img, (img.shape[1] + width_diff, img.shape[0]), cv2.INTER_AREA
+            img, (img.shape[1] + width_diff, int(ratio * img.shape[0])), cv2.INTER_AREA
         )
         return img
 
@@ -131,15 +135,23 @@ class MultiStore:
     def close(self):
         self.release()
 
+
+    def _read_test_frame(self):
+        pos_msec = self.get(CAP_PROP_POS_MSEC)
+        ret, frame = self.read()
+        self.set(CAP_PROP_POS_MSEC, pos_msec)
+        return frame
+            
+
     def get(self, index):
 
         # TODO Dont hardcode the layout here
         if index == CAP_PROP_FRAME_WIDTH:
-            width = sorted([store._metadata["imgshape"][1] for store in self._stores_list])[-1]
+            width = self._read_test_frame().shape[1]
             return width
        
         elif index == CAP_PROP_FRAME_HEIGHT:
-            height = np.sum([store._metadata["imgshape"][0] for store in self._stores_list])
+            height = self._read_test_frame().shape[0]
             return height
         
         elif index == CAP_PROP_FPS:

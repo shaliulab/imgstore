@@ -44,10 +44,10 @@ class CV2Compat:
             ][0]
             new_timestamp += timestamp_0
 
-        img, (frame_number, timestamp) = self._store._get_image_by_time(
+        img, (frame_number, timestamp) = self._get_image_by_time(
             new_timestamp
         )
-        self._store.get_image(max(0, frame_number - 1))
+        self.get_image(max(0, frame_number - 1))
 
     def _get_posmsec(self, absolute=False):
         _, (frame_number, timestamp) = self.get_next_image()
@@ -71,8 +71,8 @@ class CV2Compat:
             ][0]
             posframes += frame_number_0
 
-        img, (frame_number, timestamp) = self._store.get_image(posframes)
-        self._store.get_image(max(0, frame_number - 1))
+        img, (frame_number, timestamp) = self.get_image(posframes)
+        self.get_image(max(0, frame_number - 1))
 
     def _get_posframes(self, absolute=False):
         _, (frame_number, _) = self.get_next_image()
@@ -138,4 +138,4 @@ class CV2Compat:
         return self._getters[index](self)
 
     def set(self, index, value):
-        return self._setters[index](value)
+        return self._setters[index](self, value)
