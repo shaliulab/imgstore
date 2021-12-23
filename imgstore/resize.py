@@ -9,7 +9,7 @@ from .stores import new_for_filename, new_for_format, _ImgStore
 class ImgStoreResizer:
     def __init__(self, store):
         if isinstance(store, str):
-            self._store = new_for_filename(store_path)
+            self._store = new_for_filename(store)
         elif isinstance(store, _ImgStore):
             self._store = store
 
