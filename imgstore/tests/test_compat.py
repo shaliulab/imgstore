@@ -1,4 +1,6 @@
 import unittest
+from imgstore.tests import TEST_DATA_DIR
+import os.path
 
 import numpy as np
 from imgstore import new_for_filename
@@ -12,16 +14,18 @@ from cv2 import (
     CAP_PROP_FPS,
     CAP_PROP_FOURCC,
     CAP_PROP_FRAME_COUNT,
-)    
+)
 
-STORE_PATH = "tests/static_data/store/metadata.yaml"
+STORE_PATH = os.path.join(TEST_DATA_DIR, "imgstore_1", "metadata.yaml")
 
 class TestCompat(unittest.TestCase):
+
+    QUERY_FRAME_COUNT = 100
 
     @classmethod
     def setUpClass(cls):
         store = new_for_filename(STORE_PATH)
-        _ = store.get_image(1000)
+        _ = store.get_image(cls.QUERY_FRAME_COUNT)
         cls._store = store
 
     def test_read(self):
@@ -51,21 +55,29 @@ class TestCompat(unittest.TestCase):
 
         pos_msec = self._store.get(CAP_PROP_POS_MSEC)
         pos_frames = self._store.get(CAP_PROP_POS_FRAMES)
-        pos_rel = self._store.get(CAP_PROP_POS_AVI_RATIO)
+     
+        next_frame_number = self._store.get_frame_metadata()["frame_number"][self.QUERY_FRAME_COUNT + 1]
+        next_timestamp = self._store.get_chunk_metadata()["frame_time"][self.QUERY_FRAME_COUNT + 1]
 
-        self.assertEqual(pos_msec, )
-        self.assertEqual(pos_frames, )
-        self.assertEqual(pos_rel, )
+        self.assertEqual(pos_msec, next_timestamp)
+        self.assertEqual(pos_frames, next_frame_number)
     
     def test_get_framecount(self):
 
         frame_count = self.store.get(CAP_PROP_FRAME_COUNT)
-        self.assertEqual(frame_count, )
+        self.assertEqual(frame_count, self._store.get_frame_metadata()["frame_number"][-1])
 
+        pos_rel = self._store.get(CAP_PROP_POS_AVI_RATIO)
+        self.assertEqual(pos_rel, (self.QUERY_FRAME_COUNT + 1)/frame_count)
     
     def test_get_fps(self):
         fps = self._store.get(CAP_PROP_FPS)
-        self.assertEqual(fps, )
+        
+        framerate = self._store._metadata["framerate"]
+        self._store._load_chunk(0)
+        video_fps = self._store._cap.get(CAP_PROP_FPS)
+        self.assertEqual(fps, framerate)
+        self.assertEqual(fps, video_fps)       
 
 
     def test_release(self):
