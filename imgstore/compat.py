@@ -11,7 +11,7 @@ class CV2Compat:
     so they can be exchanged in place of the cv2.VideoCapture()
     without changing any depending code
     """
-  
+
     def read(self):
 
         try:
@@ -20,9 +20,9 @@ class CV2Compat:
                 ret = True
             else:
                 ret = False
-                
+
             return ret, img
-        
+
         except Exception as error:
             logger.error(error)
             logger.error(traceback.print_exc())
@@ -44,14 +44,14 @@ class CV2Compat:
 
     def _get_posmsec(self, absolute=False):
         _, (frame_number, timestamp) = self.get_next_image()
-        _ = self.get_image(frame_number-1)
+        _ = self.get_image(max(0, frame_number-1))
 
         if absolute:
             posmsec = timestamp
         else:
             timestamp_0 = self._index.get_chunk_metadata(self._chunk_n)["frame_time"][0]
             posmsec = timestamp - timestamp_0
-        
+
         return posmsec
 
     def _set_posframes(self, posframes, absolute=False):
@@ -73,7 +73,7 @@ class CV2Compat:
         else:
             frame_number_0 = self._index.get_chunk_metadata(self._chunk_n)["frame_number"][0]
             posframes = frame_number - frame_number_0
-       
+
         return posframes
 
 
@@ -84,7 +84,7 @@ class CV2Compat:
         duration = chunk_tn - chunk_t0
         timestamp = chunk_t0 * posrel * duration
         self._set_posmsec(timestamp, absolute=False)
-  
+
     def _get_posrel(self):
         posframes = self._getposframes()
         framecount = self._get_framecount()
@@ -128,7 +128,7 @@ class CV2Compat:
 
 
     def get(self, index):
-        return self._getters[index]()
+        return self._getters[index](self)
 
     def set(self, index, value):
         return self._setters[index](value)

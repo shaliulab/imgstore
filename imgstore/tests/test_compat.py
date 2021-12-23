@@ -44,10 +44,13 @@ class TestCompat(unittest.TestCase):
         width = self._store.get(CAP_PROP_FRAME_WIDTH)
         height = self._store.get(CAP_PROP_FRAME_HEIGHT)
 
-        self.assertEqual(width, self._WIDTH)
-        self.assertEqual(height, self._HEIGHT)
+        target_width = self._store._metadata["imgshape"][1]
+        target_height = self._store._metadata["imgshape"][0]
 
-    
+        self.assertEqual(width, target_width)
+        self.assertEqual(height, target_height)
+
+
     def test_get_pos(self):
         """
         Test that the position of the videos can be fetched
@@ -55,37 +58,37 @@ class TestCompat(unittest.TestCase):
 
         pos_msec = self._store.get(CAP_PROP_POS_MSEC)
         pos_frames = self._store.get(CAP_PROP_POS_FRAMES)
-     
+
         next_frame_number = self._store.get_frame_metadata()["frame_number"][self.QUERY_FRAME_COUNT + 1]
-        next_timestamp = self._store.get_chunk_metadata()["frame_time"][self.QUERY_FRAME_COUNT + 1]
+        next_timestamp = self._store.get_frame_metadata()["frame_time"][self.QUERY_FRAME_COUNT + 1]
 
         self.assertEqual(pos_msec, next_timestamp)
         self.assertEqual(pos_frames, next_frame_number)
-    
+
     def test_get_framecount(self):
 
-        frame_count = self.store.get(CAP_PROP_FRAME_COUNT)
+        frame_count = self._store.get(CAP_PROP_FRAME_COUNT)
         self.assertEqual(frame_count, self._store.get_frame_metadata()["frame_number"][-1])
 
         pos_rel = self._store.get(CAP_PROP_POS_AVI_RATIO)
         self.assertEqual(pos_rel, (self.QUERY_FRAME_COUNT + 1)/frame_count)
-    
+
     def test_get_fps(self):
         fps = self._store.get(CAP_PROP_FPS)
-        
+
         framerate = self._store._metadata["framerate"]
         self._store._load_chunk(0)
         video_fps = self._store._cap.get(CAP_PROP_FPS)
         self.assertEqual(fps, framerate)
-        self.assertEqual(fps, video_fps)       
+        self.assertEqual(fps, video_fps)
 
 
     def test_release(self):
-        
+
         self._store.release()
         # test that the store is closed
 
-    
+
 if __name__ == "__main__":
     unittest.main()
 
