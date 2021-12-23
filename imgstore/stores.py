@@ -85,7 +85,7 @@ class _ImgStore(CV2Compat):
         format=None,
         index=None,
         chunk_numbers=None,
-        **kwargs
+        **kwargs,
     ):
         if mode not in self._supported_modes:
             raise ValueError("mode not supported")
@@ -157,7 +157,7 @@ class _ImgStore(CV2Compat):
                 encoding,
                 write_encode_encoding,
                 format,
-                **kwargs
+                **kwargs,
             )
         elif mode == "r":
             self._init_read()
@@ -203,11 +203,10 @@ class _ImgStore(CV2Compat):
             except Exception:
                 self._log.warning(f"Cant open video for chunk {chunk}")
                 chunk += 1
-        
+
         chunk_current_frame_idx = -1
         assert self._chunk_current_frame_idx == chunk_current_frame_idx
         assert self._chunk_n == chunk
-
 
     @classmethod
     def read_metadata(cls, fullpath):
@@ -328,7 +327,7 @@ class _ImgStore(CV2Compat):
         encoding,
         write_encode_encoding,
         fmt,
-        **kwargs
+        **kwargs,
     ):
         for e in (encoding, write_encode_encoding):
             if e:
