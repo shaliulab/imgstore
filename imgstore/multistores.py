@@ -1,5 +1,10 @@
 import numpy as np
 import cv2
+from cv2 import (
+    CAP_PROP_FRAME_WIDTH,
+    CAP_PROP_FRAME_HEIGHT,
+    CAP_PROP_FPS
+)
 
 from .stores import new_for_filename
 
@@ -19,7 +24,14 @@ class MultiStore:
 
         self._adjust_by = adjust_by
 
-        self._refstore = self._stores[store_list[0]]
+        self._width = None
+        self._height = None
+
+        self._stores_list = sorted(
+            [store for store in self._stores.values()],
+            key=lambda x: x._metadata["framerate"]
+        )
+
 
     def _apply_layout(self, imgs):
         # place the imgs by row
@@ -37,36 +49,53 @@ class MultiStore:
             i = i_last
             i_last = i + ncols
 
+        rows = sorted(rows, key=lambda x: -x.shape[1])
         width = rows[0].shape[1]
 
-        for row in rows[1:]:
-            width_diff = int(row.shape[1] - width)
-            if width_diff != 0:
-                if self._adjust_by == "pad":
-
-                    if width_diff % 2 == 0:
-                        odd_pixel = 0
-                    else:
-                        odd_pixel = 1
-
-                    row = cv2.copyMakeBorder(
-                        row,
-                        0,
-                        0,
-                        width_diff / 2,
-                        width_diff / 2 + odd_pixel,
-                        cv2.BORDER_CONSTANT,
-                        value=0,
-                    )
-
-                elif self._adjust_by == "resize":
-                    row = cv2.resize(
-                        row, (width, row.shape[0]), cv2.INTER_AREA
-                    )
-
-            assert row.shape[1] == width
+        for i in range(1, len(rows)):
+            rows[i] = self._adjust_width(rows[i], width)        
 
         return np.vstack(rows)
+
+    def _adjust_width(self, img, width):
+        width_diff = int(width - img.shape[1])
+        if width_diff != 0:
+            if self._adjust_by == "pad":
+                img = self._pad_img(img, width_diff)
+
+            elif self._adjust_by == "resize":
+                img = self._resize_img()
+        
+        assert img.shape[1] == width
+        
+        return img
+
+    @staticmethod
+    def _resize_img(img, width_diff):
+        img = cv2.resize(
+            img, (img.shape[1] + width_diff, img.shape[0]), cv2.INTER_AREA
+        )
+        return img
+
+
+    @staticmethod
+    def _pad_img(img, width_diff):
+        if width_diff % 2 == 0:
+            odd_pixel = 0
+        else:
+            odd_pixel = 1
+
+        img = cv2.copyMakeBorder(
+            img,
+            0,
+            0,
+            width_diff // 2,
+            width_diff // 2 + odd_pixel,
+            cv2.BORDER_CONSTANT,
+            value=0,
+        )
+        return img
+
 
     @staticmethod
     def make_row(imgs):
@@ -84,10 +113,16 @@ class MultiStore:
             ret, img = store.read()
             imgs.append(img)
 
-        return imgs
+        return ret, imgs
 
     def read(self):
-        self._apply_layout(self._read())
+        ret, imgs = self._read()
+        if ret:
+            img = self._apply_layout(imgs)
+            return ret, img
+        
+        else:
+            return False, None
 
     def release(self):
         for store in self._stores.values():
@@ -97,7 +132,22 @@ class MultiStore:
         self.release()
 
     def get(self, index):
-        return self._refstore.get(index)
+
+        # TODO Dont hardcode the layout here
+        if index == CAP_PROP_FRAME_WIDTH:
+            width = sorted([store._metadata["imgshape"][1] for store in self._stores_list])[-1]
+            return width
+       
+        elif index == CAP_PROP_FRAME_HEIGHT:
+            height = np.sum([store._metadata["imgshape"][0] for store in self._stores_list])
+            return height
+        
+        elif index == CAP_PROP_FPS:
+            fps = self._stores_list[-1]._metadata["framerate"]
+            return fps 
+
+        else:
+            return self._stores_list[0].get(index)
 
     def set(self, index, value):
 
@@ -117,7 +167,7 @@ class MultiStore:
         return imgs
 
     def __getattr__(self, attr):
-        return getattr(self._refstore, attr)
+        return getattr(self._stores_list[0], attr)
 
 
 def new_for_filenames(store_list, **kwargs):
