@@ -1,3 +1,5 @@
+import os.path
+
 import numpy as np
 import cv2
 from cv2 import (
@@ -7,18 +9,42 @@ from cv2 import (
     CAP_PROP_FPS,
 )
 
-from .stores import new_for_filename
-
+from .stores import new_for_filename, _extract_store_metadata
 
 class MultiStore:
 
     _LAYOUT = (2, 1)
 
-    def __init__(self, store_list, layout=None, adjust_by="resize", **kwargs):
+    @classmethod
+    def new_for_filename(cls, store, *args, **kwargs):
+        
+        store_list = [store]
+    
+        metadata = _extract_store_metadata(store)
+        if "extra_cameras" in metadata:
+            for extension in metadata["extra_cameras"]:
+                extension_full_path = os.path.join(
+                    os.path.dirname(store),
+                    extension
+                )
+                store_list.append(extension_full_path)
 
-        self._stores = {
-            path: new_for_filename(path, **kwargs) for path in store_list
-        }
+        delta_time = metadata.get("delta_time", None)
+        return cls(store_list, *args, delta_time=delta_time, **kwargs)
+
+
+    def __init__(self, store_list, delta_time=None, layout=None, adjust_by="resize", **kwargs):
+
+        self._stores = [
+            new_for_filename(store_path, **kwargs)
+            for store_path in store_list
+        ]
+
+        self._store_list = sorted(
+            [store for store in self._stores],
+            key=lambda x: x._metadata["framerate"]
+        )
+
 
         if layout is None:
             self._layout = self._LAYOUT
@@ -28,10 +54,14 @@ class MultiStore:
         self._width = None
         self._height = None
 
-        self._stores_list = sorted(
-            [store for store in self._stores.values()],
-            key=lambda x: x._metadata["framerate"]
-        )
+        self._delta_time = delta_time
+
+        if delta_time is None:
+            self._delta_time_generator = sorted(
+                [
+                    store for store in self._store_list
+                ], key=lambda x: x._metadata["framerate"]
+            )[-1]
 
 
     def _apply_layout(self, imgs):
@@ -103,7 +133,6 @@ class MultiStore:
 
     @staticmethod
     def make_row(imgs):
-
         height = imgs[0].shape[0]
         for img in imgs[1:]:
             assert img.shape[0] == height
@@ -111,12 +140,28 @@ class MultiStore:
         return np.hstack(imgs)
 
     def _read(self):
-
         imgs = []
-        for store in self._stores.values():
-            ret, img = store.read()
-            imgs.append(img)
+        
 
+        if self._delta_time is None and self._delta_time_generator is not None:
+            img, (_, frame_time) = self._delta_time_generator.get_next_image()
+            imgs.append(img)
+            for store in self._store_list:
+                if store is self._delta_time_generator:
+                    continue
+                else:
+                    img, (_, _) = store._get_image_by_time(frame_time, direction="past")
+                    imgs.append(img)
+
+
+        else:
+            for store in self._store_list:
+                img, (_, _) = store._get_image_by_time(
+                    store.frame_time + self._delta_time
+                )
+                imgs.append(img)
+
+        ret = len(imgs) == len(self._store_list)
         return ret, imgs
 
     def read(self):
@@ -129,7 +174,7 @@ class MultiStore:
             return False, None
 
     def release(self):
-        for store in self._stores.values():
+        for store in self._store_list:
             store.close()
 
     def close(self):
@@ -155,15 +200,15 @@ class MultiStore:
             return height
         
         elif index == CAP_PROP_FPS:
-            fps = self._stores_list[-1]._metadata["framerate"]
+            fps = self._store_list[-1]._metadata["framerate"]
             return fps 
 
         else:
-            return self._stores_list[0].get(index)
+            return self._store_list[0].get(index)
 
     def set(self, index, value):
 
-        for store in self._stores.values():
+        for store in self._store_list:
             store.set(index, value)
 
     def get_image(self, frame_number):
@@ -172,15 +217,15 @@ class MultiStore:
     def get_image_by_time(self, timestamp):
 
         imgs = []
-        for store in self._stores.values():
+        for store in self._store_list:
             img, _ = store._get_image_by_time(timestamp)
             imgs.append(img)
 
         return imgs
 
+    @property
+    def frame_time(self):
+        return self._store_list[-1].frame_time
+
     def __getattr__(self, attr):
-        return getattr(self._stores_list[0], attr)
-
-
-def new_for_filenames(store_list, **kwargs):
-    return MultiStore(store_list, **kwargs)
+        return getattr(self._store_list[0], attr)

@@ -1,5 +1,7 @@
 import unittest
+unittest.TestLoader.sortTestMethodsUsing = None
 import os.path
+import numpy as np
 import cv2
 from cv2 import (
     CAP_PROP_FPS,
@@ -10,8 +12,8 @@ from cv2 import (
 from imgstore.tests import TEST_DATA_DIR
 from imgstore.multistores import MultiStore
 
-HR_STORE_PATH = os.path.join(TEST_DATA_DIR, "imgstore_1", "metadata.yaml")
-LR_STORE_PATH = os.path.join(TEST_DATA_DIR, "imgstore_1", "lowres", "metadata.yaml")
+STORE_PATH = os.path.join(TEST_DATA_DIR, "imgstore_1", "metadata.yaml")
+
 LR_STORE_FPS = 70
 
 class TestMultiStore(unittest.TestCase):
@@ -22,22 +24,39 @@ class TestMultiStore(unittest.TestCase):
 
     def setUp(self):
 
-        self._multistore = MultiStore(
-            store_list = [
-            HR_STORE_PATH,
-            LR_STORE_PATH,
-        ],
+        self._multistore = MultiStore.new_for_filename(
+            STORE_PATH,
             adjust_by=self._adjust_by
         )
 
-    def test_layout(self):
-        
-        ret, frame = self._multistore.read()
+
+    def test_get_fps(self):
+        fps = self._multistore.get(CAP_PROP_FPS)
+        self.assertEqual(fps, 70.0)
+
+
+    def test_read(self):
+        ret, imgs = self._multistore._read()
+
         self.assertTrue(ret)
+        self.assertTrue(isinstance(imgs, list))
+
+    def test_layout(self):
+
+        imgs = [
+            np.random.randint(0, 255, (100, 200), dtype=np.uint8),
+            np.random.randint(0, 255, (100, 100), dtype=np.uint8),
+        ]
+
+        frame = self._multistore._apply_layout(imgs)
         height, width = frame.shape
 
-        self.assertEqual(height, self._target_height)
-        self.assertEqual(width, 1514)
+        if self._adjust_by == "pad":
+            self.assertEqual(height, 200)
+        elif self._adjust_by == "resize":
+            self.assertEqual(height, 300)
+
+        self.assertEqual(width, 200)
 
     
     def test_getters(self):

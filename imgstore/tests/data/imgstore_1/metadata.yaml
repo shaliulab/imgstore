@@ -13,3 +13,4 @@ __store:
   timezone_local: Etc/UTC
   uuid: 4295f4a238874619b5171c4e2e5942b4
   version: 2
+  extra_cameras: ["lowres/metadata.yaml"]

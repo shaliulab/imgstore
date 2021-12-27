@@ -81,6 +81,7 @@ class _ImgStore(CV2Compat):
         chunksize=None,
         metadata=None,
         encoding=None,
+        annotate=False,
         write_encode_encoding=None,
         format=None,
         index=None,
@@ -119,6 +120,7 @@ class _ImgStore(CV2Compat):
         self.frame_count = 0
         self.frame_in_chunk = 0
         self.frame_time = np.nan
+        self._annotate = annotate
 
         # noinspection PyClassHasNoInit
         class _Log:
@@ -750,6 +752,38 @@ class _ImgStore(CV2Compat):
     def get_next_framenumber(self):
         return self._get_next_framenumber_and_chunk_frame_idx()[0]
 
+    def _annotate_img(self, frame, use_banner=False):
+        frame_time = self.frame_time
+        label = f"Time: {frame_time}"
+
+        width = frame.shape[1]
+
+        if use_banner:
+
+            height = max(100, frame.shape[0] // 20)
+            banner = np.ones((height, width), dtype=np.uint8) * 255
+            banner = cv2.putText(
+                banner,
+                text=label,
+                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                org=(height//3, width//10),
+                color=0, fontScale=3, thickness=3
+            )
+            
+            frame = np.vstack([banner, frame])
+        
+        else:
+            height = frame.shape[0]
+            frame = cv2.putText(
+                frame,
+                text=label,
+                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                org=(int(width * 0.05), int(height * 0.95)),
+                color=0, fontScale=1, thickness=1
+            )
+
+        return frame
+
     def _get_image(self, chunk_n, frame_idx):
         if chunk_n is not None:
             self._load_chunk(chunk_n)
@@ -759,6 +793,10 @@ class _ImgStore(CV2Compat):
         img = self._decode_image(_img)
         self._chunk_current_frame_idx = frame_idx
         self.frame_number = _frame_number
+        self.frame_time = _frame_timestamp
+
+        if self._annotate:
+            img = self._annotate_img(img)
 
         return img, (_frame_number, _frame_timestamp)
 
@@ -798,7 +836,7 @@ class _ImgStore(CV2Compat):
 
         return self._get_image(chunk_n, frame_idx)
 
-    def _get_image_by_time(self, frame_time, exact_only=False):
+    def _get_image_by_time(self, frame_time, exact_only=False, **kwargs):
 
         if exact_only:
             chunk_n, frame_idx = self._index.find_chunk(
@@ -806,7 +844,7 @@ class _ImgStore(CV2Compat):
             )
         else:
             chunk_n, frame_idx = self._index.find_chunk_nearest(
-                "frame_time", frame_time
+                "frame_time", frame_time, **kwargs
             )
 
         if chunk_n == -1:
@@ -1364,6 +1402,10 @@ class VideoImgStore(_ImgStore, ImgStoreExport):
 
             self._capfn = fn
             self._new_chunk_metadata(os.path.join(self._basedir, "%06d" % new))
+
+    @property
+    def current_video_path(self):
+        return self._capfn
 
     def _load_image(self, idx):
         if self._supports_seeking:

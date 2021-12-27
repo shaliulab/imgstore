@@ -11,6 +11,4 @@ from .apps import main_test
 from .util import ensure_color, ensure_grayscale
 from ._version import __version__
 
-from .multistores import new_for_filenames
-
 test = main_test
