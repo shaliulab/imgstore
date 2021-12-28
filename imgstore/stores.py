@@ -96,6 +96,7 @@ class _ImgStore(CV2Compat):
             imgdtype = np.dtype(imgdtype).name
 
         self._basedir = basedir
+        self._chunk_numbers = chunk_numbers
         self._mode = mode
         self._imgshape = ()
         self._imgdtype = ""
@@ -197,7 +198,12 @@ class _ImgStore(CV2Compat):
             self.frame_number = np.nan  # we haven't read any frames yet
 
     def reset_to_first_frame(self):
-        chunk = 0
+        
+        if self._chunk_numbers is None:
+            chunk = 0
+        else:
+            chunk = self._chunk_numbers[0]
+
         while True:
             try:
                 self._load_chunk(chunk)
