@@ -530,11 +530,11 @@ class _ImgStore(CV2Compat):
     
     @property
     def first_frame_number(self):
-        return self.get_frame_metadata(rowid=1)[0]
+        return self.get_frame_metadata(rowid=1)["frame_number"][0]
 
     @property
     def first_frame_time(self):
-        return self.get_frame_metadata(rowid=1)[1]
+        return self.get_frame_metadata(rowid=1)["frame_time"][0]
 
 
     def find_extra_data_files(self, extensions=EXTRA_DATA_FILE_EXTENSIONS):
