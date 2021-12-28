@@ -1,4 +1,6 @@
 import os.path
+import logging
+
 
 import numpy as np
 import cv2
@@ -11,15 +13,17 @@ from cv2 import (
 
 from .stores import new_for_filename, _extract_store_metadata
 
+logger = logging.getLogger(__name__)
+
 class MultiStore:
 
     _LAYOUT = (2, 1)
 
     @classmethod
     def new_for_filename(cls, store, *args, **kwargs):
-        
+
         store_list = [store]
-    
+
         metadata = _extract_store_metadata(store)
         if "extra_cameras" in metadata:
             for extension in metadata["extra_cameras"]:
@@ -84,7 +88,7 @@ class MultiStore:
         width = rows[0].shape[1]
 
         for i in range(1, len(rows)):
-            rows[i] = self._adjust_width(rows[i], width)        
+            rows[i] = self._adjust_width(rows[i], width)
 
         return np.vstack(rows)
 
@@ -96,16 +100,16 @@ class MultiStore:
 
             elif self._adjust_by == "resize":
                 img = self._resize_img(img, width_diff)
-        
+
         assert img.shape[1] == width
-        
+
         return img
 
     @staticmethod
     def _resize_img(img, width_diff):
-        
+
         ratio = (img.shape[1] + width_diff) / img.shape[1]
-        
+
         img = cv2.resize(
             img, (img.shape[1] + width_diff, int(ratio * img.shape[0])), cv2.INTER_AREA
         )
@@ -141,7 +145,6 @@ class MultiStore:
 
     def _read(self):
         imgs = []
-        
 
         if self._delta_time is None and self._delta_time_generator is not None:
             img, (_, frame_time) = self._delta_time_generator.get_next_image()
@@ -150,7 +153,12 @@ class MultiStore:
                 if store is self._delta_time_generator:
                     continue
                 else:
-                    img, (_, _) = store._get_image_by_time(frame_time, direction="past")
+                    if frame_time >= min(store._chunk_md["frame_time"]):
+                        img, (_, _) = store._get_image_by_time(frame_time, direction="past")
+                    else:
+                        logger.warning("Cannot find a frame further back in the past")
+                        frame_number = min(store._chunk_md["frame_number"])
+                        img, (_, _) = store.get_image(frame_number)
                     imgs.append(img)
 
 
@@ -169,7 +177,7 @@ class MultiStore:
         if ret:
             img = self._apply_layout(imgs)
             return ret, img
-        
+
         else:
             return False, None
 
@@ -186,7 +194,7 @@ class MultiStore:
         ret, frame = self.read()
         self.set(CAP_PROP_POS_MSEC, pos_msec)
         return frame
-            
+
 
     def get(self, index):
 
@@ -194,14 +202,14 @@ class MultiStore:
         if index == CAP_PROP_FRAME_WIDTH:
             width = self._read_test_frame().shape[1]
             return width
-       
+
         elif index == CAP_PROP_FRAME_HEIGHT:
             height = self._read_test_frame().shape[0]
             return height
-        
+
         elif index == CAP_PROP_FPS:
             fps = self._store_list[-1]._metadata["framerate"]
-            return fps 
+            return fps
 
         else:
             return self._store_list[0].get(index)
