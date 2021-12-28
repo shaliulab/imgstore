@@ -147,24 +147,27 @@ class MultiStore:
         imgs = []
 
         if self._delta_time is None and self._delta_time_generator is not None:
-            img, (_, frame_time) = self._delta_time_generator.get_next_image()
+            img, (frame_number, frame_time) = self._delta_time_generator.get_next_image()
             imgs.append(img)
+            logger.warning(f"Reading frame #{frame_number} at time {frame_time} from {self._delta_time_generator}")
             for store in self._store_list:
                 if store is self._delta_time_generator:
                     continue
                 else:
                     if frame_time >= min(store._chunk_md["frame_time"]):
-                        img, (_, _) = store._get_image_by_time(frame_time, direction="past")
+                        img, (frame_number_, frame_time_) = store._get_image_by_time(frame_time, direction="past")
                     else:
                         logger.warning("Cannot find a frame further back in the past")
                         frame_number = min(store._chunk_md["frame_number"])
-                        img, (_, _) = store.get_image(frame_number)
+                        img, (frame_number_, frame_time_)= store.get_image(frame_number)
+        
+                    logger.warning(f"Reading frame #{frame_number_} at time {frame_time_} from {store}")
                     imgs.append(img)
 
 
         else:
             for store in self._store_list:
-                img, (_, _) = store._get_image_by_time(
+                img, (frame_number_, frame_timestamp_)= store._get_image_by_time(
                     store.frame_time + self._delta_time
                 )
                 imgs.append(img)
