@@ -486,8 +486,8 @@ class _ImgStore(CV2Compat):
     def _get_chunk_metadata(self, chunk_n):
         return self._index.get_chunk_metadata(chunk_n)
 
-    def get_frame_metadata(self):
-        return self._index.get_all_metadata()
+    def get_frame_metadata(self, *args, **kwargs):
+        return self._index.get_all_metadata(*args, **kwargs)
 
     def _iter_extra_data_files(self, extensions=EXTRA_DATA_FILE_EXTENSIONS):
         for chunk_n, chunk_path in self._iter_chunk_n_and_chunk_paths():
@@ -527,6 +527,15 @@ class _ImgStore(CV2Compat):
         for _ in self._iter_extra_data_files():
             return True
         return False
+    
+    @property
+    def first_frame_number(self):
+        return self.get_frame_metadata(rowid=1)[0]
+
+    @property
+    def first_frame_time(self):
+        return self.get_frame_metadata(rowid=1)[1]
+
 
     def find_extra_data_files(self, extensions=EXTRA_DATA_FILE_EXTENSIONS):
         return [

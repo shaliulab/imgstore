@@ -204,11 +204,15 @@ class ImgStoreIndex(object):
         db.commit()
         db.close()
 
-    def get_all_metadata(self):
+    def get_all_metadata(self, rowid=None):
         cur = self._conn.cursor()
-        cur.execute(
-            "SELECT frame_number, frame_time FROM frames ORDER BY rowid;"
-        )
+        cmd = "SELECT frame_number, frame_time FROM frames"
+        if rowid is None:
+            cmd += " ORDER BY rowid;"
+        else:
+            cmd += f" WHERE rowid={rowid}"
+
+        cur.execute(cmd)
         return self._get_metadata(cur, ["frame_number", "frame_time"])
 
     def get_chunk_metadata(self, chunk_n):
