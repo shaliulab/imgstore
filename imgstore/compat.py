@@ -47,11 +47,11 @@ class CV2Compat:
         img, (frame_number, timestamp) = self._get_image_by_time(
             new_timestamp
         )
-        self.get_image(max(0, frame_number - 1))
+        self.get_image(max(self.first_frame_number, frame_number - 1))
 
     def _get_posmsec(self, absolute=False):
         _, (frame_number, timestamp) = self.get_next_image()
-        _ = self.get_image(max(0, frame_number - 1))
+        _ = self.get_image(max(self.first_frame_number, frame_number - 1))
 
         if absolute:
             posmsec = timestamp
@@ -72,11 +72,11 @@ class CV2Compat:
             posframes += frame_number_0
 
         img, (frame_number, timestamp) = self.get_image(posframes)
-        self.get_image(max(0, frame_number - 1))
+        self.get_image(max(self.first_frame_number, frame_number - 1))
 
     def _get_posframes(self, absolute=False):
         _, (frame_number, _) = self.get_next_image()
-        _ = self.get_image(max(0, frame_number - 1))
+        _ = self.get_image(max(self.first_frame_number, frame_number - 1))
 
         if absolute:
             posframes = frame_number
