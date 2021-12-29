@@ -49,14 +49,15 @@ class MultiStore:
         )]
 
         self._main_store = self._stores[0]
+        ref_chunk = int(ref_chunk)
         self._main_store._chunk = ref_chunk
         self._main_store._load_chunk(ref_chunk)
         self._main_store.reset_to_first_frame()
 
-        self._stores = [
+        self._stores.extend([
             new_for_filename(store_path, **kwargs)
             for store_path in store_list[1:]
-        ]
+        ])
 
         self._store_list = sorted(
             [store for store in self._stores],
@@ -65,8 +66,7 @@ class MultiStore:
 
         # sync
         for store in self._stores[1:]:
-            store._set_posmsec(self._stores[0].frame_time)
-
+            store._set_posmsec(self._stores[0].frame_time, absolute=True)
 
         if layout is None:
             self._layout = self._LAYOUT
@@ -164,6 +164,7 @@ class MultiStore:
         imgs = []
 
         if self._delta_time is None:
+            import ipdb; ipdb.set_trace()
             img, (frame_number, frame_time) = self._delta_time_generator.get_next_image()
             imgs.append(img)
             logger.warning(f"Reading frame #{frame_number} at time {frame_time} from {self._delta_time_generator}")
@@ -177,7 +178,7 @@ class MultiStore:
                         logger.warning("Cannot find a frame further back in the past")
                         frame_number = min(store._chunk_md["frame_number"])
                         img, (frame_number_, frame_time_)= store.get_image(frame_number)
-        
+
                     logger.warning(f"Reading frame #{frame_number_} at time {frame_time_} from {store}")
                     imgs.append(img)
 
