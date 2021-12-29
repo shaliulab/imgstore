@@ -37,12 +37,14 @@ class MultiStore:
         return cls(store_list, *args, delta_time=delta_time, **kwargs)
 
 
-    def __init__(self, store_list, delta_time=None, layout=None, adjust_by="resize", **kwargs):
+    def __init__(self, store_list, ref_chunk, delta_time=None, layout=None, adjust_by="resize", **kwargs):
 
         self._stores = [
             new_for_filename(store_path, **kwargs)
             for store_path in store_list
         ]
+
+        self._stores[0]._chunk = ref_chunk
 
         self._store_list = sorted(
             [store for store in self._stores],
@@ -59,13 +61,12 @@ class MultiStore:
         self._height = None
 
         self._delta_time = delta_time
+        self._delta_time_generator = sorted(
+            [
+                store for store in self._store_list
+            ], key=lambda x: x._metadata["framerate"]
+        )[-1]
 
-        if delta_time is None:
-            self._delta_time_generator = sorted(
-                [
-                    store for store in self._store_list
-                ], key=lambda x: x._metadata["framerate"]
-            )[-1]
 
 
     def _apply_layout(self, imgs):
@@ -146,7 +147,7 @@ class MultiStore:
     def _read(self):
         imgs = []
 
-        if self._delta_time is None and self._delta_time_generator is not None:
+        if self._delta_time is None:
             img, (frame_number, frame_time) = self._delta_time_generator.get_next_image()
             imgs.append(img)
             logger.warning(f"Reading frame #{frame_number} at time {frame_time} from {self._delta_time_generator}")
@@ -240,3 +241,7 @@ class MultiStore:
 
     def __getattr__(self, attr):
         return getattr(self._store_list[0], attr)
+
+    @property
+    def data_interval(self):
+        return self._delta_time_generator.get_data_interval(what="frame_number", pad=10)

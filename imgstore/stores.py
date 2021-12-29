@@ -96,6 +96,7 @@ class _ImgStore(CV2Compat):
             imgdtype = np.dtype(imgdtype).name
 
         self._basedir = basedir
+        self._chunk = None
         self._chunk_numbers = chunk_numbers
         self._mode = mode
         self._imgshape = ()
@@ -535,6 +536,65 @@ class _ImgStore(CV2Compat):
     @property
     def first_frame_time(self):
         return self.get_frame_metadata(rowid=1)["frame_time"][0]
+
+    @property
+    def last_frame_number(self):
+        return self.get_frame_metadata(rowid=-1)["frame_number"][0]
+
+    @property
+    def last_frame_time(self):
+        return self.get_frame_metadata(rowid=-1)["frame_time"][0]
+
+    @property
+    def first_frame_number_chunk(self):
+        if self._chunk is None:
+            chunk = self._chunk_n
+        else:
+            chunk = self._chunk
+
+        return self._get_chunk_metadata(chunk)["frame_number"][0]
+
+    @property
+    def first_frame_time_chunk(self):
+        if self._chunk is None:
+            chunk = self._chunk_n
+        else:
+            chunk = self._chunk
+
+        return self._get_chunk_metadata(chunk)["frame_time"][0]
+    
+    @property
+    def last_frame_number_chunk(self):
+        if self._chunk is None:
+            chunk = self._chunk_n
+        else:
+            chunk = self._chunk
+
+        return self._get_chunk_metadata(chunk)["frame_number"][-1]
+    
+    @property
+    def last_frame_time_chunk(self):
+        if self._chunk is None:
+            chunk = self._chunk_n
+        else:
+            chunk = self._chunk
+
+        return self._get_chunk_metadata(chunk)["frame_time"][-1]
+
+
+    def get_data_interval(self, what, pad=10):
+        # pad = seconds
+        pad *= int(float(self._metadata["framerate"]))
+        # pad = number of frames
+        if what == "frame_number":
+            begin = max(self.first_frame_number, self.first_frame_number_chunk - pad)
+            end = min(self.last_frame_number, self.last_frame_number_chunk + pad)
+            
+            assert begin < end
+            return (begin, end)
+        else:
+            self._log.warning("Null interval")
+            return None
 
 
     def find_extra_data_files(self, extensions=EXTRA_DATA_FILE_EXTENSIONS):
