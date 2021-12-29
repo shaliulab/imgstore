@@ -281,16 +281,17 @@ class MultiStore:
 
     @property
     def data_interval(self):
-        _, (frame_number, frame_time) = self._delta_time_generator.get_next_image()
+        if self._data_interval is None:
 
-        main_store_interval = self._main_store.get_data_interval(what="frame_time", pad=10)
-        self._delta_time_generator._set_posmsec(main_store_interval[0], absolute=True)
-        begin = self._delta_time_generator.frame_number
-        self._delta_time_generator._set_posmsec(main_store_interval[1], absolute=True)
-        end = self._delta_time_generator.frame_number
-        self._delta_time_generator.get_image(frame_number - 1)
-        
+            _, (frame_number, frame_time) = self._delta_time_generator.get_next_image()
 
-        assert begin < end
-        return (begin, end)
+            main_store_interval = self._main_store.get_data_interval(what="frame_time", pad=10)
+            self._delta_time_generator._set_posmsec(main_store_interval[0], absolute=True)
+            begin = self._delta_time_generator.frame_number
+            self._delta_time_generator._set_posmsec(main_store_interval[1], absolute=True)
+            end = self._delta_time_generator.frame_number
+            self._delta_time_generator.get_image(frame_number - 1)
+            
+            assert begin < end
+            self._data_interval = (begin, end)
 
