@@ -239,17 +239,22 @@ class MultiStore:
 
     def set(self, index, value):
 
+
         if index in [CAP_PROP_POS_FRAMES, CAP_PROP_POS_MSEC]:
-            self._delta_time_generator.set(index, value, absolute=True)
+            try:
+                self._delta_time_generator.set(index, value, absolute=True)
+            except:
+                import ipdb; ipdb.set_trace()
             for store in self._store_list:
                 if store is self._delta_time_generator:
                     continue
             else:
                 store._set_posmsec(
                     self._delta_time_generator.frame_time,
+                    absolute=True,
                     direction="past"
                 )
-        
+
         else:
 
             for store in self._store_list:
