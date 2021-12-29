@@ -216,6 +216,13 @@ class _ImgStore(CV2Compat):
                 self._log.warning(f"Cant open video for chunk {chunk}")
                 chunk += 1
 
+        # pretend one frame has been read and forget it
+        # this way self.frame_time and friends get initialized
+        # to something meaningful
+        _, (frame_number, _) = self.get_next_image()
+        # but still preserve state
+        self._load_chunk(chunk)
+
         chunk_current_frame_idx = -1
         assert self._chunk_current_frame_idx == chunk_current_frame_idx
         assert self._chunk_n == chunk
