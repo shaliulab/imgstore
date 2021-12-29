@@ -208,23 +208,22 @@ class ImgStoreIndex(object):
         cur = self._conn.cursor()
 
         if rowid > 0:
-            order = "ASC"
+            pass
         elif rowid < 0:
             order = "DESC"
-            rowid *= -1
         else:
             rowid = 1
-            order = "ASC"
             log.warning(
                 "rowid=0 is not valid."
                 "Interpreting as rowid=1"
             )
 
         cmd = "SELECT frame_number, frame_time FROM frames"
-        if rowid is None:
-            cmd += f" ORDER BY rowid {order};"
+        if rowid > 0:
+            cmd += f" WHERE rowid={rowid};"
         else:
-            cmd += f" WHERE rowid={rowid}"
+            cmd += f" ORDER BY rowid {order}"
+            cmd += " LIMIT 1;"
 
         cur.execute(cmd)
         return self._get_metadata(cur, ["frame_number", "frame_time"])
