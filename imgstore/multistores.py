@@ -37,14 +37,26 @@ class MultiStore:
         return cls(store_list, *args, delta_time=delta_time, **kwargs)
 
 
-    def __init__(self, store_list, ref_chunk, delta_time=None, layout=None, adjust_by="resize", **kwargs):
+    def __init__(self, store_list, ref_chunk, chunk_numbers=None, delta_time=None, layout=None, adjust_by="resize", **kwargs):
+
+
+        main_store = store_list[0]
+
+        self._stores = [new_for_filename(
+            main_store,
+            chunk_numbers=chunk_numbers,
+            **kwargs
+        )]
+
+        self._main_store = self._stores[0]
+        self._main_store._chunk = ref_chunk
+        self._main_store._load_chunk(ref_chunk)
+        self._main_store.reset_to_first_frame()
 
         self._stores = [
             new_for_filename(store_path, **kwargs)
-            for store_path in store_list
+            for store_path in store_list[1:]
         ]
-
-        self._stores[0]._chunk = ref_chunk
 
         self._store_list = sorted(
             [store for store in self._stores],
@@ -54,7 +66,6 @@ class MultiStore:
         # sync
         for store in self._stores[1:]:
             store._set_posmsec(self._stores[0].frame_time)
-
 
 
         if layout is None:
