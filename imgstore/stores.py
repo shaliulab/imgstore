@@ -597,7 +597,7 @@ class _ImgStore(CV2Compat):
             end = min(self.last_frame_number, self.last_frame_number_chunk + pad)
 
         elif what == "frame_time":
-            begin = max(self.first_frame_time self.first_frame_time_chunk - pad * 1000)
+            begin = max(self.first_frame_time, self.first_frame_time_chunk - pad * 1000)
             end = min(self.last_frame_time, self.last_frame_time_chunk + pad * 1000)
 
         else:
