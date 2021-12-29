@@ -589,18 +589,23 @@ class _ImgStore(CV2Compat):
 
 
     def get_data_interval(self, what, pad=10):
-        # pad = seconds
-        pad *= int(float(self._metadata["framerate"]))
-        # pad = number of frames
+
         if what == "frame_number":
+            pad *= int(float(self._metadata["framerate"]))
+            # pad = number of frames
             begin = max(self.first_frame_number, self.first_frame_number_chunk - pad)
             end = min(self.last_frame_number, self.last_frame_number_chunk + pad)
 
-            assert begin < end
-            return (begin, end)
+        elif what == "frame_time":
+            begin = max(self.first_frame_time self.first_frame_time_chunk - pad * 1000)
+            end = min(self.last_frame_time, self.last_frame_time_chunk + pad * 1000)
+
         else:
             self._log.warning("Null interval")
             return None
+
+        assert begin < end
+        return (begin, end)
 
 
     def find_extra_data_files(self, extensions=EXTRA_DATA_FILE_EXTENSIONS):
