@@ -216,13 +216,6 @@ class _ImgStore(CV2Compat):
                 self._log.warning(f"Cant open video for chunk {chunk}")
                 chunk += 1
 
-        # pretend one frame has been read and forget it
-        # this way self.frame_time and friends get initialized
-        # to something meaningful
-        _, (frame_number, _) = self.get_next_image()
-        # but still preserve state
-        self._load_chunk(chunk)
-
         chunk_current_frame_idx = -1
         assert self._chunk_current_frame_idx == chunk_current_frame_idx
         assert self._chunk_n == chunk
@@ -1374,10 +1367,23 @@ class VideoImgStore(_ImgStore, ImgStoreExport):
                 len(self._imgshape) == 3
             )
 
+            self._initialize_metadata()
+
         self._log.info(
             "store is native color: %s (or grayscale with encoding: '%s')"
             % (self._color, self._encoding)
         )
+
+
+    def _initialize_metadata(self):
+        chunk = self._chunk_n
+        # pretend one frame has been read and forget it
+        # this way self.frame_time and friends get initialized
+        # to something meaningful
+        _, (frame_number, _) = self.get_next_image()
+        # but still preserve state
+        self._load_chunk(chunk)
+
 
     def _readability_check(self, smd_class, smd_version):
         can_read = {
