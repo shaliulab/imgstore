@@ -231,6 +231,9 @@ class _ImgStore(CV2Compat):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
+    def __repr__(self):
+        return f"{self.__class__.__name__} - {self.full_path}"
+
     def _readability_check(self, smd_class, smd_version):
         class_name = getattr(self, "class_name", self.__class__.__name__)
         if smd_class != class_name:
