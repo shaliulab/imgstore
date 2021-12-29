@@ -9,6 +9,7 @@ from cv2 import (
     CAP_PROP_FRAME_HEIGHT,
     CAP_PROP_POS_MSEC,
     CAP_PROP_FPS,
+    CAP_PROP_POS_FRAMES,
 )
 
 from .stores import new_for_filename, _extract_store_metadata
@@ -238,8 +239,21 @@ class MultiStore:
 
     def set(self, index, value):
 
-        for store in self._store_list:
-            store.set(index, value)
+        if index in [CAP_PROP_POS_FRAMES, CAP_PROP_POS_MSEC]:
+            self._delta_time_generator.set(index, value, absolute=True)
+            for store in self._store_list:
+                if store is self._delta_time_generator:
+                    continue
+            else:
+                store._set_posmsec(
+                    self._delta_time_generator.frame_time,
+                    direction="past"
+                )
+        
+        else:
+
+            for store in self._store_list:
+                store.set(index, value)
 
     def get_image(self, frame_number):
         raise Exception("get_image method is not meaningful in a multistore")

@@ -36,7 +36,7 @@ class CV2Compat:
     def release(self):
         self.close()
 
-    def _set_posmsec(self, new_timestamp, absolute=False):
+    def _set_posmsec(self, new_timestamp, absolute=False, **kwargs):
 
         if not absolute:
             timestamp_0 = self._index.get_chunk_metadata(self._chunk_n)[
@@ -45,7 +45,7 @@ class CV2Compat:
             new_timestamp += timestamp_0
 
         img, (frame_number, timestamp) = self._get_image_by_time(
-            new_timestamp
+            new_timestamp, **kwargs
         )
         self.get_image(max(self.first_frame_number, frame_number - 1))
 
