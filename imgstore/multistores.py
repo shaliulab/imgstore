@@ -51,6 +51,11 @@ class MultiStore:
             key=lambda x: x._metadata["framerate"]
         )
 
+        # sync
+        for store in self._stores[1:]:
+            store._set_posmsec(self._stores[0].frame_time)
+
+
 
         if layout is None:
             self._layout = self._LAYOUT
