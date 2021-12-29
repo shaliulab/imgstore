@@ -137,5 +137,5 @@ class CV2Compat:
     def get(self, index):
         return self._getters[index](self)
 
-    def set(self, index, value):
-        return self._setters[index](self, value)
+    def set(self, index, value, **kwargs):
+        return self._setters[index](self, value, **kwargs)

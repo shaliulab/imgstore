@@ -199,7 +199,7 @@ class _ImgStore(CV2Compat):
             self.frame_number = np.nan  # we haven't read any frames yet
 
     def reset_to_first_frame(self):
-        
+
         if self._chunk is None:
             if self._chunk_numbers is None:
                 chunk = 0
@@ -534,7 +534,7 @@ class _ImgStore(CV2Compat):
         for _ in self._iter_extra_data_files():
             return True
         return False
-    
+
     @property
     def first_frame_number(self):
         return self.get_frame_metadata(rowid=1)["frame_number"][0]
@@ -568,7 +568,7 @@ class _ImgStore(CV2Compat):
             chunk = self._chunk
 
         return self._get_chunk_metadata(chunk)["frame_time"][0]
-    
+
     @property
     def last_frame_number_chunk(self):
         if self._chunk is None:
@@ -577,7 +577,7 @@ class _ImgStore(CV2Compat):
             chunk = self._chunk
 
         return self._get_chunk_metadata(chunk)["frame_number"][-1]
-    
+
     @property
     def last_frame_time_chunk(self):
         if self._chunk is None:
@@ -589,7 +589,6 @@ class _ImgStore(CV2Compat):
 
 
     def get_data_interval(self, what, pad=10):
-        # pad = seconds
 
         if what == "frame_number":
             pad *= int(float(self._metadata["framerate"]))
@@ -856,9 +855,9 @@ class _ImgStore(CV2Compat):
                 org=(height//3, width//10),
                 color=0, fontScale=3, thickness=3
             )
-            
+
             frame = np.vstack([banner, frame])
-        
+
         else:
             height = frame.shape[0]
             frame = cv2.putText(
@@ -1539,7 +1538,7 @@ class VideoImgStore(_ImgStore, ImgStoreExport):
             if self._cap is not None:
                 self._cap.release()
 
-            self._log.debug("loading chunk %s" % n)
+            self._log.debug(f"{self} is loading chunk {n}")
             self._capfn = fn
             # noinspection PyArgumentList
             self._cap = cv2.VideoCapture(self._capfn)
