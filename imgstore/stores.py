@@ -200,10 +200,13 @@ class _ImgStore(CV2Compat):
 
     def reset_to_first_frame(self):
         
-        if self._chunk_numbers is None:
-            chunk = 0
+        if self._chunk is None:
+            if self._chunk_numbers is None:
+                chunk = 0
+            else:
+                chunk = self._chunk_numbers[0]
         else:
-            chunk = self._chunk_numbers[0]
+            chunk = self._chunk
 
         while True:
             try:
