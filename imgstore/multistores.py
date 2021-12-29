@@ -49,6 +49,8 @@ class MultiStore:
             **kwargs
         )]
 
+        self._data_interval = None
+
         ref_chunk = int(ref_chunk)
         self._main_store = self._stores[0]
         ref_chunk = int(ref_chunk)
@@ -294,4 +296,6 @@ class MultiStore:
             
             assert begin < end
             self._data_interval = (begin, end)
+
+        return self._data_interval
 
