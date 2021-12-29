@@ -48,6 +48,7 @@ class MultiStore:
             **kwargs
         )]
 
+        ref_chunk = int(ref_chunk)
         self._main_store = self._stores[0]
         self._main_store._chunk = ref_chunk
         self._main_store._load_chunk(ref_chunk)
