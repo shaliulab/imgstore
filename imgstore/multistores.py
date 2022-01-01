@@ -1,5 +1,6 @@
 import os.path
 import logging
+import traceback
 
 
 import numpy as np
@@ -266,7 +267,8 @@ class MultiStore:
                 self._delta_time_generator.set(index, value, absolute=True)
             except Exception as error:
                 logger.error(error)
-                # import ipdb; ipdb.set_trace()
+                logger.error(traceback.print_exc())
+                import ipdb; ipdb.set_trace()
             for store in self._store_list:
                 if store is self._delta_time_generator:
                     continue
@@ -313,7 +315,7 @@ class MultiStore:
             self._delta_time_generator._set_posmsec(main_store_interval[1], absolute=True)
             end = self._delta_time_generator.frame_number
             self._delta_time_generator.get_image(frame_number - 1)
-            
+
             assert begin < end
             self._data_interval = (begin, end)
 
