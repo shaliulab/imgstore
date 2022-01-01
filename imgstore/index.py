@@ -207,23 +207,27 @@ class ImgStoreIndex(object):
     def get_all_metadata(self, rowid=None):
         cur = self._conn.cursor()
 
-        if rowid > 0:
-            pass
-        elif rowid < 0:
-            order = "DESC"
-        else:
-            rowid = 1
-            log.warning(
-                "rowid=0 is not valid."
-                "Interpreting as rowid=1"
-            )
+        if rowid is not None:
 
-        cmd = "SELECT frame_number, frame_time FROM frames"
-        if rowid > 0:
-            cmd += f" WHERE rowid={rowid};"
+            if rowid > 0:
+                pass
+            elif rowid < 0:
+                order = "DESC"
+            else:
+                rowid = 1
+                log.warning(
+                    "rowid=0 is not valid."
+                    "Interpreting as rowid=1"
+                )
+
+            cmd = "SELECT frame_number, frame_time FROM frames"
+            if rowid > 0:
+                cmd += f" WHERE rowid={rowid};"
+            else:
+                cmd += f" ORDER BY rowid {order}"
+                cmd += " LIMIT 1;"
         else:
-            cmd += f" ORDER BY rowid {order}"
-            cmd += " LIMIT 1;"
+            cmd = "SELECT frame_number, frame_time FROM frames ORDER BY rowid"
 
         cur.execute(cmd)
         return self._get_metadata(cur, ["frame_number", "frame_time"])
@@ -352,5 +356,12 @@ class ImgStoreIndex(object):
         cur.execute(
             *cmd,
         )
-        chunk_n, frame_idx = cur.fetchone()
+
+        data = cur.fetchone()
+
+        if data is None:
+            return self.find_chunk_nearest(what, value, direction="all")
+        else:
+            chunk_n, frame_idx = data
+
         return chunk_n, frame_idx

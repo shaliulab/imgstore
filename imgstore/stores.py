@@ -210,15 +210,21 @@ class _ImgStore(CV2Compat):
 
         while True:
             try:
-                self._load_chunk(chunk)
+                self._load_chunk(chunk, _force=True)
                 break
             except Exception:
                 self._log.warning(f"Cant open video for chunk {chunk}")
                 chunk += 1
 
         chunk_current_frame_idx = -1
-        assert self._chunk_current_frame_idx == chunk_current_frame_idx
-        assert self._chunk_n == chunk
+        
+        try:
+            assert self._chunk_current_frame_idx == chunk_current_frame_idx
+            assert self._chunk_n == chunk
+        except Exception as error:
+            import ipdb; ipdb.set_trace()
+            logger.error(error)
+
 
     @classmethod
     def read_metadata(cls, fullpath):
@@ -957,7 +963,7 @@ class _ImgStore(CV2Compat):
             )
 
         if chunk_n == -1:
-            raise ValueError("frame #%s not found in any chunk" % frame_number)
+            raise ValueError(f"frame #{frame_number} not found in any chunk of {self}")
 
         return self._get_image(chunk_n, frame_idx)
 

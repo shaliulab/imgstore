@@ -10,6 +10,7 @@ from cv2 import (
     CAP_PROP_POS_MSEC,
     CAP_PROP_FPS,
     CAP_PROP_POS_FRAMES,
+    CAP_PROP_FRAME_COUNT,
 )
 
 from .stores import new_for_filename, _extract_store_metadata
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 class MultiStore:
 
     _LAYOUT = (2, 1)
+    _TOLERANCE = 1000
 
     @classmethod
     def new_for_filename(cls, store, *args, **kwargs):
@@ -168,22 +170,23 @@ class MultiStore:
         imgs = []
 
         if self._delta_time is None:
-            import ipdb; ipdb.set_trace()
             img, (frame_number, frame_time) = self._delta_time_generator.get_next_image()
             imgs.append(img)
-            logger.warning(f"Reading frame #{frame_number} at time {frame_time} from {self._delta_time_generator}")
+            logger.info(f"Reading frame #{frame_number} at time {frame_time} from {self._delta_time_generator}")
             for store in self._store_list:
                 if store is self._delta_time_generator:
                     continue
                 else:
-                    if frame_time >= min(store._chunk_md["frame_time"]):
+                    try:
                         img, (frame_number_, frame_time_) = store._get_image_by_time(frame_time, direction="past")
-                    else:
-                        logger.warning("Cannot find a frame further back in the past")
-                        frame_number = min(store._chunk_md["frame_number"])
-                        img, (frame_number_, frame_time_)= store.get_image(frame_number)
+                        if abs(frame_time_ - frame_time) > self._TOLERANCE:
+                            logger.warning(f"Time between frames greater than {self._TOLERANCE}")
 
-                    logger.warning(f"Reading frame #{frame_number_} at time {frame_time_} from {store}")
+                    except Exception as error:
+                        logger.warning(f"{store} cannot find a frame at {frame_time} ms")
+                        img, (frame_number_, frame_time_)= store.get_image(0)
+
+                    logger.info(f"Reading frame #{frame_number_} at time {frame_time_} from {store}")
                     imgs.append(img)
 
 
@@ -233,20 +236,37 @@ class MultiStore:
             return height
 
         elif index == CAP_PROP_FPS:
-            fps = self._store_list[-1]._metadata["framerate"]
+            fps = self._delta_time_generator._metadata["framerate"]
             return fps
 
+        elif index == CAP_PROP_POS_MSEC:
+            return self._delta_time_generator.frame_time
+        
+        elif index == CAP_PROP_FRAME_COUNT:
+            last_frame_number = self._delta_time_generator.last_frame_number
+            logger.warning("###########################")
+            logger.warning(last_frame_number)
+            logger.warning("###########################")
+            return last_frame_number
+
+        elif index == CAP_PROP_POS_FRAMES:
+            return self._delta_time_generator.frame_number
+            
         else:
-            return self._store_list[0].get(index)
+            return self._main_store.get(index)
 
     def set(self, index, value):
+
+
+        logger.warning(f"Setting {index} to {value}")
 
 
         if index in [CAP_PROP_POS_FRAMES, CAP_PROP_POS_MSEC]:
             try:
                 self._delta_time_generator.set(index, value, absolute=True)
-            except:
-                import ipdb; ipdb.set_trace()
+            except Exception as error:
+                logger.error(error)
+                # import ipdb; ipdb.set_trace()
             for store in self._store_list:
                 if store is self._delta_time_generator:
                     continue
