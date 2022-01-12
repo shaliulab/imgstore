@@ -1,7 +1,7 @@
 import os.path
 import logging
 import traceback
-
+import glob
 
 import numpy as np
 import cv2
@@ -20,11 +20,10 @@ logger = logging.getLogger(__name__)
 
 class MultiStore:
 
-    _LAYOUT = (2, 1)
     _TOLERANCE = 1000
 
     @classmethod
-    def new_for_filename(cls, store, *args, **kwargs):
+    def new_for_filename(cls, store, chunk_numbers=None, *args, **kwargs):
 
         store_list = [store]
 
@@ -37,8 +36,29 @@ class MultiStore:
                 )
                 store_list.append(extension_full_path)
 
+        
+        if chunk_numbers is None:
+            index = sorted(glob.glob(
+                os.path.join(
+                    os.path.dirname(store),
+                    "*.npz"
+                )
+            ))
+            
+            chunk_numbers = []
+            for file in index:
+                chunk, ext = os.path.splitext(os.path.basename(file))
+                chunk = int(chunk)
+                chunk_numbers.append(chunk)
+
+        if "corrupt_chunks" in metadata:
+            for corrupt_chunk in metadata["corrupt_chunks"]:
+                if corrupt_chunk in chunk_numbers:
+                    chunk_numbers.pop(chunk_numbers.index(corrupt_chunk))
+                    logger.warning(f"Chunk {corrupt_chunk} is corrupt. Omitting")
+
         delta_time = metadata.get("delta_time", None)
-        return cls(store_list, *args, delta_time=delta_time, **kwargs)
+        return cls(store_list, *args, delta_time=delta_time, chunk_numbers=chunk_numbers, **kwargs)
 
 
     def __init__(self, store_list, ref_chunk, chunk_numbers=None, delta_time=None, layout=None, adjust_by="resize", **kwargs):
@@ -75,8 +95,8 @@ class MultiStore:
         for store in self._stores[1:]:
             store._set_posmsec(self._stores[0].frame_time, absolute=True)
 
-        if layout is None:
-            self._layout = self._LAYOUT
+        self._layout = layout
+
 
         self._adjust_by = adjust_by
 
@@ -91,14 +111,22 @@ class MultiStore:
         )[-1]
 
 
+    @property
+    def layout(self):
+        if self._layout is None:
+            return (len(self._stores), 1)
+        else:
+            return self._layout
+            
+
 
     def _apply_layout(self, imgs):
         # place the imgs by row
         # so the first row is filled,
         # then second, until last
 
-        ncols = self._layout[1]
-        nrows = self._layout[0]
+        ncols = self.layout[1]
+        nrows = self.layout[0]
         i = 0
         i_last = ncols
         rows = []
@@ -268,7 +296,6 @@ class MultiStore:
             except Exception as error:
                 logger.error(error)
                 logger.error(traceback.print_exc())
-                import ipdb; ipdb.set_trace()
             for store in self._store_list:
                 if store is self._delta_time_generator:
                     continue

@@ -87,14 +87,12 @@ class ImgStoreExport:
                 )
 
             key = key[0]
-            # import ipdb; ipdb.set_trace()
             encoder = self._cv2_fmts[key]
 
         video_writer = cv2.VideoWriter(
             output, encoder, framerate, resolution, isColor=isColor
         )
 
-        # import ipdb; ipdb.set_trace()
 
         for i, idx in tqdm.tqdm(enumerate(frame_indices)):
             img, (retrieved_idx, _) = self.get_image(idx)
