@@ -2,6 +2,7 @@ import os.path
 import logging
 import traceback
 import glob
+import datetime
 
 import numpy as np
 import cv2
@@ -65,6 +66,8 @@ class MultiStore:
 
 
         main_store = store_list[0]
+
+        import ipdb; ipdb.set_trace()
 
         self._stores = [new_for_filename(
             main_store,
@@ -217,6 +220,13 @@ class MultiStore:
 
                     logger.info(f"Reading frame #{frame_number_} at time {frame_time_} from {store}")
                     imgs.append(img)
+                    store_frame_time_human=datetime.datetime.from_timestamp(store.frame_time).strftime('%H:%M:%S.%f')
+                    print(
+                        f"store {store} is set to\n"
+                        f"* chunk {store._chunk_n}\n"
+                        f"* frame_in_chunk {store.frame_in_chunk}\n"
+                        f"* frame_time {store.frame_time} ({store_frame_time_human})\n"
+                    )
 
 
         else:
