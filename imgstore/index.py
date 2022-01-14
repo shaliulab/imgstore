@@ -343,35 +343,37 @@ class ImgStoreIndex(object):
 
         return chunk_n, frame_idx
 
-    def find_chunk_nearest(self, what, value, direction="all"):
-        assert what in ("frame_number", "frame_time")
+    def find_chunk_nearest(self, query, value, target = "chunk, frame_idx", direction="all"):
+        assert query in ("frame_number", "frame_time")
         cur = self._conn.cursor()
         
         if direction=="all":
             cmd = (
-                "SELECT chunk, frame_idx FROM frames ORDER BY ABS(? - {}) LIMIT 1;".format(
-                    what
+                f"SELECT {target}"
+                " FROM frames ORDER BY ABS(? - {}) LIMIT 1;".format(
+                    query
                 ),
                 (value,)
             )
         
         elif direction=="future":
             cmd = (
-                "SELECT chunk, frame_idx"
-                "FROM frames ORDER BY ABS(? - {})"
-                "WHERE (? - {}) <= 0"
-                "LIMIT 1;".format(what, what),
+                f"SELECT {target}"
+                " FROM frames"
+                " WHERE (? - {}) <= 0"
+                " ORDER BY ABS(? - {})"
+                " LIMIT 1;".format(query, query),
                 (value, value,)
 
             )
         
         elif direction=="past":
             cmd = (
-                "SELECT chunk, frame_idx"
+                f"SELECT {target}"
                 " FROM frames"
                 " WHERE (? - {}) >= 0"
                 " ORDER BY ABS(? - {})"
-                " LIMIT 1;".format(what, what),
+                " LIMIT 1;".format(query, query),
                 (value, value,)
 
             )
@@ -383,7 +385,7 @@ class ImgStoreIndex(object):
         data = cur.fetchone()
 
         if data is None:
-            return self.find_chunk_nearest(what, value, direction="all")
+            return self.find_chunk_nearest(query, value, direction="all")
         else:
             chunk_n, frame_idx = data
 

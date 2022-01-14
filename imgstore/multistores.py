@@ -67,6 +67,7 @@ class MultiStore:
             f"store {store} is set to\n"
             f"* chunk {store._chunk_n}\n"
             f"* frame_in_chunk {store._chunk_current_frame_idx}\n"
+            f"* frame_number {store.frame_number}\n"
             f"* frame_time {store.frame_time} ({store_frame_time_human})\n"
         )
 
@@ -248,8 +249,12 @@ class MultiStore:
 
     def read(self):
         ret, imgs = self._read()
+
         if ret:
             img = self._apply_layout(imgs)
+            if self._main_store._metadata.get("idtrackerai-color", False):
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+            
             return ret, img
 
         else:
