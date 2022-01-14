@@ -22,7 +22,7 @@ import tzlocal
 import dateutil.parser
 
 try:
-    import bloscpack
+    import bloscpack # type: ignore
 except ImportError:
     bloscpack = None
 
@@ -223,7 +223,7 @@ class _ImgStore(CV2Compat):
             assert self._chunk_n == chunk
         except Exception as error:
             import ipdb; ipdb.set_trace()
-            logger.error(error)
+            logging.error(error)
 
 
     @classmethod

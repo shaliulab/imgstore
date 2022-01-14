@@ -7,6 +7,7 @@ import numpy as np
 from .stores import new_for_filename, get_supported_formats, new_for_format
 from .ui import new_window
 from .util import motif_get_parse_true_fps
+from .multistores import MultiStore
 
 _log = logging.getLogger("imgstore.apps")
 
@@ -158,3 +159,27 @@ def main_generate_timecodes():
     store = new_for_filename(args.path[0])
 
     generate_timecodes(store, sys.stdout)
+
+
+def multistore_index_parser(ap=None):
+    import argparse
+
+    if ap is None:
+        ap = argparse.ArgumentParser()
+    
+    ap.add_argument("--input")
+    return ap
+
+
+def main_multistore_index(ap=None, args=None):
+
+    if args is None:
+        ap = multistore_index_parser(ap)
+        args = ap.parse_args()
+    
+    store = MultiStore.new_for_filename(
+        args.input,
+        ref_chunk=0
+    )
+    import ipdb; ipdb.set_trace()
+

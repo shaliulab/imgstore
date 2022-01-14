@@ -88,6 +88,7 @@ class ImgStoreIndex(object):
         # # all chunks in the store [0,1,2, ... ]
         cur.execute("SELECT chunk FROM chunks ORDER BY chunk;")
         self._chunks = tuple(row[0] for row in cur)
+        self._chunk_index = None
 
     @classmethod
     def create_database(cls, conn):
@@ -276,7 +277,28 @@ class ImgStoreIndex(object):
         else:
             return None
 
+    @property
+    def chunk_index(self):
+        if self._chunk_index is None:
+            self._chunk_index = {
+                "frame_number": {chunk: self.get_chunk_interval(chunk, "frame_number") for chunk in self._chunks},
+                "frame_time": {chunk: self.get_chunk_interval(chunk, "frame_time") for chunk in self._chunks}
+            }
+
+        return self._chunk_index
+
     def get_chunk_and_frame_idx(self, frame_number):
+        logging.warning("Deprecated. Use get_chunk_and_frame_idx_from_frame_number")
+        return self.get_chunk_and_frame_idx_from_frame_number(frame_number)
+
+    def get_chunk_and_frame_idx_from_frame_time(self, frame_time):
+        return self.get_chunk_and_frame_idx_(frame_time, "frame_time")
+
+    def get_chunk_and_frame_idx_from_frame_number(self, frame_number):
+        return self.get_chunk_and_frame_idx_(frame_number, "frame_number")
+
+
+    def get_chunk_and_frame_idx_(self, value, metavar="frame_time"):
         """
         Given a frame_number, return the chunk to which it belongs,
         and the index of the frame inside the chunk
@@ -284,7 +306,7 @@ class ImgStoreIndex(object):
         """
         cur = self._conn.cursor()
         cur.execute(
-            f"SELECT chunk, frame_idx FROM frames where frame_number = {frame_number}"
+            f"SELECT chunk, frame_idx FROM frames where {metavar} = {value}"
         )
         data = []
         for d in cur:
@@ -294,6 +316,7 @@ class ImgStoreIndex(object):
             return chunk, frame_idx
         else:
             return None
+
 
     def find_chunk(self, what, value):
         assert what in ("frame_number", "frame_time", "index")

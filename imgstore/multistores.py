@@ -36,7 +36,6 @@ class MultiStore:
                     extension
                 )
                 store_list.append(extension_full_path)
-
         
         if chunk_numbers is None:
             index = sorted(glob.glob(
@@ -61,13 +60,21 @@ class MultiStore:
         delta_time = metadata.get("delta_time", None)
         return cls(store_list, *args, delta_time=delta_time, chunk_numbers=chunk_numbers, **kwargs)
 
+    @staticmethod
+    def log_position_along(store):
+        store_frame_time_human=datetime.datetime.fromtimestamp(store.frame_time/1000).strftime('%H:%M:%S.%f')
+        print(
+            f"store {store} is set to\n"
+            f"* chunk {store._chunk_n}\n"
+            f"* frame_in_chunk {store._chunk_current_frame_idx}\n"
+            f"* frame_time {store.frame_time} ({store_frame_time_human})\n"
+        )
+
 
     def __init__(self, store_list, ref_chunk, chunk_numbers=None, delta_time=None, layout=None, adjust_by="resize", **kwargs):
 
 
         main_store = store_list[0]
-
-        import ipdb; ipdb.set_trace()
 
         self._stores = [new_for_filename(
             main_store,
@@ -88,6 +95,10 @@ class MultiStore:
             new_for_filename(store_path, **kwargs)
             for store_path in store_list[1:]
         ])
+
+        for store in self._stores:
+            logger.info(f"Computing chunk index of {store}")
+            _ = store._index.chunk_index
 
         self._store_list = sorted(
             [store for store in self._stores],
@@ -202,9 +213,11 @@ class MultiStore:
         imgs = []
 
         if self._delta_time is None:
-            img, (frame_number, frame_time) = self._delta_time_generator.get_next_image()
+            store =  self._delta_time_generator
+            img, (frame_number, frame_time) = store.get_next_image()
+            self.log_position_along(store)
             imgs.append(img)
-            logger.info(f"Reading frame #{frame_number} at time {frame_time} from {self._delta_time_generator}")
+            # logger.info(f"Reading frame #{frame_number} at time {frame_time} from {self._delta_time_generator}")
             for store in self._store_list:
                 if store is self._delta_time_generator:
                     continue
@@ -220,13 +233,7 @@ class MultiStore:
 
                     logger.info(f"Reading frame #{frame_number_} at time {frame_time_} from {store}")
                     imgs.append(img)
-                    store_frame_time_human=datetime.datetime.from_timestamp(store.frame_time).strftime('%H:%M:%S.%f')
-                    print(
-                        f"store {store} is set to\n"
-                        f"* chunk {store._chunk_n}\n"
-                        f"* frame_in_chunk {store.frame_in_chunk}\n"
-                        f"* frame_time {store.frame_time} ({store_frame_time_human})\n"
-                    )
+                    self.log_position_along(store)
 
 
         else:
