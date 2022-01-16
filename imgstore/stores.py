@@ -890,6 +890,8 @@ class _ImgStore(CV2Compat):
         if self._annotate:
             img = self._annotate_img(img)
 
+        self._last_img = img
+
         return img, (_frame_number, _frame_timestamp)
 
     def get_next_image(self):
@@ -1158,6 +1160,7 @@ class DirectoryImgStore(_ImgStore):
 
         self._chunk_cdir = ""
         self._chunk_md = {}
+        self._last_img = None
 
         # keep compat with VideoImgStore
         kwargs.pop("videosize", None)

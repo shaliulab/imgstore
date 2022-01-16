@@ -181,5 +181,6 @@ def main_multistore_index(ap=None, args=None):
         args.input,
         ref_chunk=0
     )
-    import ipdb; ipdb.set_trace()
+
+    store.export_index_to_csv()
 

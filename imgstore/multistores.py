@@ -3,7 +3,7 @@ import logging
 import traceback
 import glob
 import datetime
-
+import pandas as pd
 import numpy as np
 import cv2
 from cv2 import (
@@ -36,7 +36,7 @@ class MultiStore:
                     extension
                 )
                 store_list.append(extension_full_path)
-        
+
         if chunk_numbers is None:
             index = sorted(glob.glob(
                 os.path.join(
@@ -44,7 +44,7 @@ class MultiStore:
                     "*.npz"
                 )
             ))
-            
+
             chunk_numbers = []
             for file in index:
                 chunk, ext = os.path.splitext(os.path.basename(file))
@@ -60,6 +60,20 @@ class MultiStore:
         delta_time = metadata.get("delta_time", None)
         return cls(store_list, *args, delta_time=delta_time, chunk_numbers=chunk_numbers, **kwargs)
 
+    @property
+    def width(self):
+        if self._width is None:
+            self._width = self.get(CAP_PROP_FRAME_WIDTH)
+
+        return self._width
+
+    @property
+    def height(self):
+        if self._height is None:
+            self._height = self.get(CAP_PROP_FRAME_HEIGHT)
+
+        return self._height
+
     @staticmethod
     def log_position_along(store):
         store_frame_time_human=datetime.datetime.fromtimestamp(store.frame_time/1000).strftime('%H:%M:%S.%f')
@@ -70,6 +84,10 @@ class MultiStore:
             f"* frame_number {store.frame_number}\n"
             f"* frame_time {store.frame_time} ({store_frame_time_human})\n"
         )
+
+    @property
+    def delta_frame_number(self):
+        return self._delta_frame_number
 
 
     def __init__(self, store_list, ref_chunk, chunk_numbers=None, delta_time=None, layout=None, adjust_by="resize", **kwargs):
@@ -84,6 +102,12 @@ class MultiStore:
         )]
 
         self._data_interval = None
+
+        self._width = None
+        self._height = None
+        self._crossindex = None
+        self._delta_frame_number = 0
+
 
         ref_chunk = int(ref_chunk)
         self._main_store = self._stores[0]
@@ -111,6 +135,7 @@ class MultiStore:
             store._set_posmsec(self._stores[0].frame_time, absolute=True)
 
         self._layout = layout
+        self._main_only = False
 
 
         self._adjust_by = adjust_by
@@ -124,6 +149,7 @@ class MultiStore:
                 store for store in self._store_list
             ], key=lambda x: x._metadata["framerate"]
         )[-1]
+        self.get_crossindex()
 
 
     @property
@@ -132,7 +158,7 @@ class MultiStore:
             return (len(self._stores), 1)
         else:
             return self._layout
-            
+
 
 
     def _apply_layout(self, imgs):
@@ -216,6 +242,7 @@ class MultiStore:
         if self._delta_time is None:
             store =  self._delta_time_generator
             img, (frame_number, frame_time) = store.get_next_image()
+            self._delta_frame_number = frame_number
             self.log_position_along(store)
             imgs.append(img)
             # logger.info(f"Reading frame #{frame_number} at time {frame_time} from {self._delta_time_generator}")
@@ -247,18 +274,81 @@ class MultiStore:
         ret = len(imgs) == len(self._store_list)
         return ret, imgs
 
-    def read(self):
+    def _read_all(self):
         ret, imgs = self._read()
-
         if ret:
             img = self._apply_layout(imgs)
-            if self._main_store._metadata.get("idtrackerai-color", False):
-                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-            
             return ret, img
 
         else:
             return False, None
+
+
+    def _main_store_has_updated(self):
+        return self._crossindex.loc[
+            self._crossindex["delta_number"] == self._delta_frame_number,
+            "update_main"
+        ].values.tolist()[0]
+
+
+    def _read_main_only(self):
+
+        self._delta_frame_number+=1
+
+        if self._main_store_has_updated():
+            ret, img = self._main_store.read()
+
+        else:
+            ret = True
+            img = self._main_store._last_img
+
+        if ret:
+
+            bottom_pad = self.height - img.shape[0]
+            right_pad = self.width - img.shape[1]
+
+            img = cv2.copyMakeBorder(
+                img,
+                top=0,
+                bottom=bottom_pad,
+                left=0,
+                right=right_pad,
+                borderType=cv2.BORDER_CONSTANT,
+                value=[0, 0, 0]
+            )
+
+            return ret, img
+
+        else:
+            return False, None
+
+
+
+    def toggle(self):
+        self._main_only = not self._main_only
+        if self._main_only:
+            for store in self._stores:
+                if store is self._main_store:
+                    pass
+                else:
+                    frame_time = self._main_store.frame_time
+                    img, (frame_number, frame_time) = store._get_image_by_time(frame_time)
+                    store.get_image(frame_number - 1)
+
+
+    def read(self, main_only=None):
+
+        if (main_only is None and self._main_only) or main_only is True:
+            ret, img = self._read_main_only()
+        else:
+            ret, img = self._read_all()
+
+        if self._main_store._metadata.get("idtrackerai-color", False):
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+        return ret, img
+
+
 
     def release(self):
         for store in self._store_list:
@@ -270,7 +360,7 @@ class MultiStore:
 
     def _read_test_frame(self):
         pos_msec = self.get(CAP_PROP_POS_MSEC)
-        ret, frame = self.read()
+        ret, frame = self.read(main_only=False)
         self.set(CAP_PROP_POS_MSEC, pos_msec)
         return frame
 
@@ -292,7 +382,7 @@ class MultiStore:
 
         elif index == CAP_PROP_POS_MSEC:
             return self._delta_time_generator.frame_time
-        
+
         elif index == CAP_PROP_FRAME_COUNT:
             last_frame_number = self._delta_time_generator.last_frame_number
             logger.warning("###########################")
@@ -301,20 +391,19 @@ class MultiStore:
             return last_frame_number
 
         elif index == CAP_PROP_POS_FRAMES:
-            return self._delta_time_generator.frame_number
-            
+            return self.delta_frame_number
+
+
         else:
             return self._main_store.get(index)
 
     def set(self, index, value):
 
-
         logger.warning(f"Setting {index} to {value}")
-
-
         if index in [CAP_PROP_POS_FRAMES, CAP_PROP_POS_MSEC]:
             try:
                 self._delta_time_generator.set(index, value, absolute=True)
+                self._delta_frame_number = self._delta_time_generator.frame_number
             except Exception as error:
                 logger.error(error)
                 logger.error(traceback.print_exc())
@@ -369,4 +458,100 @@ class MultiStore:
             self._data_interval = (begin, end)
 
         return self._data_interval
+
+
+    def compute_main_chunk_and_frame_idx(self, crossindex):
+
+        start_index = {v[0]: k for k, v in self._main_store._index.chunk_index["frame_number"].items()}
+        chunks = []
+        frame_idxs = []
+        counter = crossindex["main_number"].values[0]
+        chunk =  self._main_store._index.get_chunk_and_frame_idx_from_frame_number(counter)
+        last_frame_number = 0
+
+
+        for frame_number in crossindex["main_number"]:
+            if frame_number in start_index:
+                chunk = start_index.pop(frame_number)
+                if len(chunks) != 0: counter = 0
+
+            chunks.append(chunk)
+            frame_idxs.append(counter)
+            if last_frame_number != frame_number:
+                counter += 1
+
+            last_frame_number = frame_number
+
+
+        return chunks, frame_idxs
+
+    def get_crossindex(self):
+        """
+        Returns:
+            crossindex (pd.DataFrame): A dataframe as many rows as frames on the longest store and columns:
+                delta_number  frame_time  main_number  main_chunk  main_frame_idx  update_main
+
+                * delta_number is the frame_number of the longest store (delta_time_generator)
+                * frame_time is the delta_time_generator frame_time
+                * main_number is the frame_number in the main store
+                * main_chunk is the chunk id in the main store
+                * main_frame_idx is the frame_idx in the main store
+                * update_main is always False except when a delta time generator time step causes the main_store img to update
+        """
+
+
+        if self._crossindex is None:
+
+            if os.path.exists("cross_index.csv"):
+                self._crossindex = pd.read_csv("cross_index.csv", index_col=0)
+            else:
+                # supported only for two stores
+                if len(self._stores) != 2:
+                    raise NotImplementedError
+
+
+                delta_metadata = pd.DataFrame.from_dict(
+                    self._delta_time_generator.get_frame_metadata()
+                )
+
+                main_metadata = pd.DataFrame.from_dict(
+                    self._main_store.get_frame_metadata()
+                )
+
+                delta_metadata.columns = ["delta_number", "frame_time"]
+                main_metadata.columns = ["main_number", "frame_time"]
+
+                crossindex = pd.merge_asof(
+                    delta_metadata, main_metadata,
+                    direction="backward",
+                    tolerance=1000,
+                    left_on="frame_time",
+                    right_on="frame_time",
+                )
+
+
+                import ipdb; ipdb.set_trace()
+
+                crossindex=crossindex.loc[
+                    ~np.isnan(crossindex["main_number"])
+                ]
+
+
+                chunks, frame_idxs = self.compute_main_chunk_and_frame_idx(crossindex)
+
+
+                # start_index = {v[0]: k for k, v in self._main_store._index.chunk_index["frame_number"].items()}
+                crossindex["main_chunk"] = chunks
+                crossindex["main_frame_idx"] = frame_idxs
+                crossindex["update_main"] = False
+                crossindex.loc[crossindex["main_number"].drop_duplicates().index, "update_main"] = True
+
+                self._crossindex = crossindex
+
+        return self._crossindex
+
+
+    def export_index_to_csv(self):
+        cross_index = self.get_crossindex()
+        cross_index.to_csv("cross_index.csv")
 
