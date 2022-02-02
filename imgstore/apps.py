@@ -168,6 +168,7 @@ def multistore_index_parser(ap=None):
         ap = argparse.ArgumentParser()
     
     ap.add_argument("--input")
+    ap.add_argument("--ref-chunk", dest="ref_chunk", default=0, type=int)
     return ap
 
 
@@ -179,7 +180,7 @@ def main_multistore_index(ap=None, args=None):
     
     store = MultiStore.new_for_filename(
         args.input,
-        ref_chunk=0
+        ref_chunk=args.ref_chunk
     )
 
     store.export_index_to_csv()

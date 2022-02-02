@@ -76,6 +76,7 @@ setup(
             'imgstore-view = imgstore.apps:main_viewer',
             'imgstore-save = imgstore.apps:main_saver',
             'imgstore-test = imgstore.apps:main_test',
+            'multistore-index = imgstore.apps:main_multistore_index',
         ]
     },
 )

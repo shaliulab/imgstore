@@ -61,6 +61,10 @@ class MultiStore:
         return cls(store_list, *args, delta_time=delta_time, chunk_numbers=chunk_numbers, **kwargs)
 
     @property
+    def CROSS_INDEX_FILE(self):
+        return os.path.join(os.path.dirname(self._main_store.full_path), "cross_index.csv")
+
+    @property
     def width(self):
         if self._width is None:
             self._width = self.get(CAP_PROP_FRAME_WIDTH)
@@ -155,7 +159,7 @@ class MultiStore:
     @property
     def layout(self):
         if self._layout is None:
-            return (len(self._stores), 1)
+            return (1, len(self._stores))
         else:
             return self._layout
 
@@ -231,8 +235,12 @@ class MultiStore:
     @staticmethod
     def make_row(imgs):
         height = imgs[0].shape[0]
-        for img in imgs[1:]:
+        for i in range(1, len(imgs)):
+            img = imgs[i]
+            width = int(img.shape[1] * (imgs[0].shape[0] / img.shape[0]))
+            img = cv2.resize(img, (width, imgs[0].shape[0]), cv2.INTER_AREA)
             assert img.shape[0] == height
+            imgs[i] = img
 
         return np.hstack(imgs)
 
@@ -241,10 +249,9 @@ class MultiStore:
 
         if self._delta_time is None:
             store =  self._delta_time_generator
-            img, (frame_number, frame_time) = store.get_next_image()
+            delta_img, (frame_number, frame_time) = store.get_next_image()
             self._delta_frame_number = frame_number
             self.log_position_along(store)
-            imgs.append(img)
             # logger.info(f"Reading frame #{frame_number} at time {frame_time} from {self._delta_time_generator}")
             for store in self._store_list:
                 if store is self._delta_time_generator:
@@ -262,6 +269,9 @@ class MultiStore:
                     logger.info(f"Reading frame #{frame_number_} at time {frame_time_} from {store}")
                     imgs.append(img)
                     self.log_position_along(store)
+
+
+            imgs.append(delta_img)
 
 
         else:
@@ -282,6 +292,16 @@ class MultiStore:
 
         else:
             return False, None
+
+
+    def get_image_by_time(self, timestamp):
+
+        imgs = []
+        for store in self._store_list:
+            img, index = store._get_image_by_time(timestamp)
+            imgs.append(img)
+
+        return (self._apply_layout(imgs), index)
 
 
     def _main_store_has_updated(self):
@@ -336,7 +356,7 @@ class MultiStore:
                     store.get_image(frame_number - 1)
 
 
-    def read(self, main_only=None):
+    def get_next_image(self, main_only=None):
 
         if (main_only is None and self._main_only) or main_only is True:
             ret, img = self._read_main_only()
@@ -346,8 +366,18 @@ class MultiStore:
         if self._main_store._metadata.get("idtrackerai-color", False):
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
-        return ret, img
 
+        return img, (self.delta_frame_number, self._delta_time_generator.frame_time)
+
+
+
+    def read(self, *args, **kwargs):
+        img, (frame_number, frame_time) = self.get_next_image(*args, **kwargs)
+        if img is not None:
+            return True, img
+        
+        else:
+            return False, None
 
 
     def release(self):
@@ -425,14 +455,6 @@ class MultiStore:
     def get_image(self, frame_number):
         raise Exception("get_image method is not meaningful in a multistore")
 
-    def get_image_by_time(self, timestamp):
-
-        imgs = []
-        for store in self._store_list:
-            img, _ = store._get_image_by_time(timestamp)
-            imgs.append(img)
-
-        return imgs
 
     @property
     def frame_time(self):
@@ -466,14 +488,21 @@ class MultiStore:
         chunks = []
         frame_idxs = []
         counter = crossindex["main_number"].values[0]
-        chunk =  self._main_store._index.get_chunk_and_frame_idx_from_frame_number(counter)
-        last_frame_number = 0
+        chunk, frame_idx =  self._main_store._index.get_chunk_and_frame_idx_from_frame_number(counter)
+        last_frame_number = -1
+        chunk_lengths = {}
+        chunk_lengths[chunk] = len(self._index.get_chunk_metadata(chunk)["frame_number"])
 
+        counter = frame_idx
 
         for frame_number in crossindex["main_number"]:
+
+            if counter == chunk_lengths[chunk]:
+                counter = 0
+
             if frame_number in start_index:
                 chunk = start_index.pop(frame_number)
-                if len(chunks) != 0: counter = 0
+                chunk_lengths[chunk] = len(self._index.get_chunk_metadata(chunk)["frame_number"])
 
             chunks.append(chunk)
             frame_idxs.append(counter)
@@ -482,8 +511,25 @@ class MultiStore:
 
             last_frame_number = frame_number
 
-
         return chunks, frame_idxs
+
+    def _get_single_crossindex(self):
+
+        metadata = self._main_store.get_frame_metadata()
+
+
+        crossindex = pd.DataFrame({
+            "delta_number": metadata["frame_number"],
+            "frame_time": metadata["frame_time"],
+            "main_number": metadata["frame_number"],
+        })
+
+
+        chunks, frame_idxs = self.compute_main_chunk_and_frame_idx(crossindex)
+        crossindex["main_chunk"] =  chunks
+        crossindex["main_frame_idx"] = frame_idxs
+        crossindex["update_main"] = True
+        return crossindex
 
     def get_crossindex(self):
         """
@@ -502,49 +548,46 @@ class MultiStore:
 
         if self._crossindex is None:
 
-            if os.path.exists("cross_index.csv"):
-                self._crossindex = pd.read_csv("cross_index.csv", index_col=0)
+            if os.path.exists(self.CROSS_INDEX_FILE):
+                self._crossindex = pd.read_csv(self.CROSS_INDEX_FILE, index_col=0)
             else:
                 # supported only for two stores
-                if len(self._stores) != 2:
+                if len(self._stores) == 1:
+                    crossindex = self._get_single_crossindex()
+                elif len(self._stores) > 2:
                     raise NotImplementedError
+                else:
 
+                    delta_metadata = pd.DataFrame.from_dict(
+                        self._delta_time_generator.get_frame_metadata()
+                    )
 
-                delta_metadata = pd.DataFrame.from_dict(
-                    self._delta_time_generator.get_frame_metadata()
-                )
+                    main_metadata = pd.DataFrame.from_dict(
+                        self._main_store.get_frame_metadata()
+                    )
 
-                main_metadata = pd.DataFrame.from_dict(
-                    self._main_store.get_frame_metadata()
-                )
+                    delta_metadata.columns = ["delta_number", "frame_time"]
+                    main_metadata.columns = ["main_number", "frame_time"]
 
-                delta_metadata.columns = ["delta_number", "frame_time"]
-                main_metadata.columns = ["main_number", "frame_time"]
+                    crossindex = pd.merge_asof(
+                        delta_metadata, main_metadata,
+                        direction="backward",
+                        tolerance=1000,
+                        left_on="frame_time",
+                        right_on="frame_time",
+                    )
 
-                crossindex = pd.merge_asof(
-                    delta_metadata, main_metadata,
-                    direction="backward",
-                    tolerance=1000,
-                    left_on="frame_time",
-                    right_on="frame_time",
-                )
+                    crossindex=crossindex.loc[
+                        ~np.isnan(crossindex["main_number"])
+                    ]
 
+                    chunks, frame_idxs = self.compute_main_chunk_and_frame_idx(crossindex)
 
-                import ipdb; ipdb.set_trace()
-
-                crossindex=crossindex.loc[
-                    ~np.isnan(crossindex["main_number"])
-                ]
-
-
-                chunks, frame_idxs = self.compute_main_chunk_and_frame_idx(crossindex)
-
-
-                # start_index = {v[0]: k for k, v in self._main_store._index.chunk_index["frame_number"].items()}
-                crossindex["main_chunk"] = chunks
-                crossindex["main_frame_idx"] = frame_idxs
-                crossindex["update_main"] = False
-                crossindex.loc[crossindex["main_number"].drop_duplicates().index, "update_main"] = True
+                    # start_index = {v[0]: k for k, v in self._main_store._index.chunk_index["frame_number"].items()}
+                    crossindex["main_chunk"] = chunks
+                    crossindex["main_frame_idx"] = frame_idxs
+                    crossindex["update_main"] = False
+                    crossindex.loc[crossindex["main_number"].drop_duplicates().index, "update_main"] = True
 
                 self._crossindex = crossindex
 
@@ -553,5 +596,5 @@ class MultiStore:
 
     def export_index_to_csv(self):
         cross_index = self.get_crossindex()
-        cross_index.to_csv("cross_index.csv")
+        cross_index.to_csv(self.CROSS_INDEX_FILE)
 
