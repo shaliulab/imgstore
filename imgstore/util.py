@@ -272,3 +272,4 @@ def motif_extra_data_h5_to_df(store, path):
         dat["sample_delay"] = np.asarray(f["sample_delay"])[mask]
 
         return pd.DataFrame(dat)
+

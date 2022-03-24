@@ -14,6 +14,8 @@ import shutil
 import json
 
 import cv2
+import cv2cuda
+
 import yaml
 import numpy as np
 import pandas as pd
@@ -796,7 +798,8 @@ class _ImgStore(CV2Compat):
         self._decode_image = lambda x: x
 
     def add_image(self, img, frame_number, frame_time):
-        frame = self._encode_image(img)
+        #frame = self._encode_image(img)
+        frame = img
         self.frame_in_chunk += 1
         self._save_image(
             frame, frame_number, frame_time, self.frame_in_chunk - 1
@@ -1309,8 +1312,12 @@ class VideoImgStore(_ImgStore, ImgStoreExport):
     _cv2_fmts = {
         "mjpeg": FourCC("M", "J", "P", "G"),
         "mjpeg/avi": FourCC("M", "J", "P", "G"),
+        "mjpeg/mp4": FourCC("M", "J", "P", "G"),
         "h264/mkv": FourCC("H", "2", "6", "4"),
         "avc1/mp4": FourCC("a", "v", "c", "1"),
+        "h264/mp4": FourCC("H", "2", "6", "4"),
+        "x264/mp4": FourCC("X", "2", "6", "4"),
+        "h264_nvenc/mp4": "h264_nvenc",
     }
 
     _DEFAULT_CHUNKSIZE = 10000
@@ -1326,6 +1333,7 @@ class VideoImgStore(_ImgStore, ImgStoreExport):
         # backwards compat
         if fmt == "mjpeg":
             kwargs["format"] = fmt = "mjpeg/avi"
+        self._fmt = fmt
 
         # default to seeking enable
         seek = kwargs.pop("seek", True)
@@ -1469,8 +1477,13 @@ class VideoImgStore(_ImgStore, ImgStoreExport):
 
     def _save_image(self, img, frame_number, frame_time, frame_in_chunk):
         # we always write color because its more supported
+        before = time.time()
         self._cap.write(img)
-        if not os.path.isfile(self._capfn):
+        after = time.time()
+        time_ms_write = 1000*(after - before)
+        logging.debug(f"cap._write took {time_ms_write} ms")
+
+        if self._codec != "h264_nvenc" and not os.path.isfile(self._capfn):
             raise Exception(
                 "Your opencv build does support writing this codec"
             )
@@ -1487,14 +1500,33 @@ class VideoImgStore(_ImgStore, ImgStoreExport):
             fn = os.path.join(self._basedir, "%06d%s" % (new, self._ext))
             h, w = self._imgshape[:2]
             try:
-                self._cap = cv2.VideoWriter(
-                    filename=fn,
-                    apiPreference=cv2.CAP_FFMPEG,
-                    fourcc=self._codec,
-                    fps=self._fps,
-                    frameSize=(w, h),
-                    isColor=self._isColor,
-                )
+
+                if self._codec == "h264_nvenc":
+
+                    print("Using cv2cuda.VideoWriter")
+
+                    self._cap = cv2cuda.VideoWriter(
+                        filename=fn,
+                        apiPreference="FFMPEG",
+                        fourcc="h264_nvenc",
+                        fps=self._fps,
+                        frameSize=(w, h),
+                        isColor=self._isColor
+                    )
+
+                    print(self._cap)
+                
+                else:
+
+                    print("Using cv2.VideoWriter")
+                    self._cap = cv2.VideoWriter(
+                        filename=fn,
+                        apiPreference=cv2.CAP_FFMPEG,
+                        fourcc=self._codec,
+                        fps=self._fps,
+                        frameSize=(w, h),
+                        isColor=self._isColor,
+                    )
             except TypeError:
                 self._log.error(
                     "old (< 3.2) cv2 not supported (this is %r)"

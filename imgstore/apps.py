@@ -1,13 +1,22 @@
 from __future__ import print_function, absolute_import
 import logging
-
+import os.path
 import cv2
 import numpy as np
+import shutil
 
-from .stores import new_for_filename, get_supported_formats, new_for_format
+from .stores import (
+    new_for_filename,
+    get_supported_formats,
+    read_metadata,
+    new_for_format
+)
+
 from .ui import new_window
 from .util import motif_get_parse_true_fps
 from .multistores import MultiStore
+import cv2cuda
+
 
 _log = logging.getLogger("imgstore.apps")
 
@@ -167,7 +176,7 @@ def multistore_index_parser(ap=None):
     if ap is None:
         ap = argparse.ArgumentParser()
     
-    ap.add_argument("--input")
+    ap.add_argument("--input", help="Path to imgstore folder or metadata.yaml")
     ap.add_argument("--ref-chunk", dest="ref_chunk", default=0, type=int)
     return ap
 
@@ -185,3 +194,104 @@ def main_multistore_index(ap=None, args=None):
 
     store.export_index_to_csv()
 
+def clip_video(input, chunk, interval, extension):
+    INPUT_VIDEO = os.path.join(input, str(chunk).zfill(6) + extension)
+    OUTPUT_VIDEO = os.path.join(input, "clips", str(chunk).zfill(6) + extension)
+
+    assert os.path.exists(INPUT_VIDEO)
+
+    cap = cv2.VideoCapture(
+        INPUT_VIDEO
+    )
+
+    cap.set(cv2.CAP_PROP_POS_FRAMES, interval[0])
+    frameSize=(
+        int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+        int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    )
+
+    video_writer = cv2cuda.VideoWriter(
+        filename=OUTPUT_VIDEO,
+        apiPreference="FFMPEG",
+        fourcc="h264_nvenc",
+        fps=cap.get(cv2.CAP_PROP_FPS),
+        frameSize=frameSize,
+        isColor=False,
+    )
+
+    while True:
+
+        ret, frame = cap.read()
+
+        if len(frame.shape) == 3:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        video_writer.write(frame)
+
+        if int(cap.get(cv2.CAP_PROP_POS_FRAMES)) == interval[1]:
+            break
+
+    
+    cap.release()
+    video_writer.release()
+
+def clip_index(input, chunk, interval, extension=".npz"):
+
+    INPUT_INDEX = os.path.join(input, str(chunk).zfill(6) + extension)
+    OUTPUT_INDEX = os.path.join(input, "clips", str(chunk).zfill(6) + extension)
+
+    data = np.load(INPUT_INDEX)
+    data.allow_pickle=True
+    data=dict(data)
+
+    data_dict = data.copy()
+    data_dict = {
+        "frame_in_chunk": data["frame_in_chunk"][interval[0]:interval[1]],
+        "frame_time": data["frame_time"][interval[0]:interval[1]],
+        "frame_number": data["frame_number"][interval[0]:interval[1]],
+    }
+
+    with open(OUTPUT_INDEX, "wb") as f:
+        # noinspection PyTypeChecker
+        np.savez(f, **data_dict)
+
+
+def clip_chunk(ap=None, args=None):
+
+    if args is None:
+        ap = multistore_index_parser(ap)
+        ap.add_argument("--interval", nargs=2, type=int)
+        args = ap.parse_args()
+
+    _, metadata = read_metadata(args.input)
+    extension = metadata["extension"]
+
+    os.makedirs(
+        os.path.join(
+            args.input, "clips"
+        ),
+        exist_ok=True
+    )
+
+    _log.info("Clipping video...")
+    clip_video(input=args.input, chunk=args.ref_chunk, interval=args.interval, extension=extension)
+    _log.info("Clipping index...")
+    clip_index(input=args.input, chunk=args.ref_chunk, interval=args.interval, extension=".npz")
+
+    _log.info("Copying json and png")
+    shutil.copyfile(
+        os.path.join(
+            args.input, str(args.ref_chunk).zfill(6) + ".extra.json"
+        ),
+        os.path.join(
+            args.input, "clips", str(args.ref_chunk).zfill(6) + ".extra.json"
+        )
+    )
+
+    shutil.copyfile(
+        os.path.join(
+            args.input, str(args.ref_chunk).zfill(6) + ".png"
+        ),
+        os.path.join(
+            args.input, "clips", str(args.ref_chunk).zfill(6) + ".png"
+        )
+    )
