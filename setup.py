@@ -7,19 +7,14 @@
 import os.path as op
 from setuptools import setup, find_packages
 
-import git
-
 this_directory = op.abspath(op.dirname(__file__))
 with open(op.join(this_directory, 'README.md'), 'rb') as f:
     long_description = f.read().decode('UTF-8')
 
 
 
-repo = git.Repo()
-git_hash = repo.head.object.hexsha
 # attention. you need to update the numbers ALSO in the imgstore/__init__.py file
-version = "0.3.1" + "." + git_hash
-
+version = "0.3.1" 
 with open("imgstore/_version.py", "w") as fh:
     fh.write(f"__version__ = '{version}'\n")
 
@@ -52,6 +47,7 @@ setup(
         'Programming Language :: Python :: 3.6',
     ],
     install_requires=[
+        'opencv-python',
         'numpy',
         'pandas<=1.2.4',
         'pyyaml',
@@ -77,6 +73,7 @@ setup(
             'imgstore-save = imgstore.apps:main_saver',
             'imgstore-test = imgstore.apps:main_test',
             'multistore-index = imgstore.apps:main_multistore_index',
+            'clip-chunk = imgstore.apps:clip_chunk',
         ]
     },
 )
