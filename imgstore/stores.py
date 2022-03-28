@@ -36,6 +36,7 @@ from .constants import (
     STORE_INDEX_FILENAME,
     EXTRA_DATA_FILE_EXTENSIONS,
     FRAME_MD as _FRAME_MD,
+    FMT_TO_CODEC,
 )
 from .util import (
     ImageCodecProcessor,
@@ -1309,16 +1310,7 @@ class DirectoryImgStore(_ImgStore):
 class VideoImgStore(_ImgStore, ImgStoreExport):
     _supported_modes = "wr"
 
-    _cv2_fmts = {
-        "mjpeg": FourCC("M", "J", "P", "G"),
-        "mjpeg/avi": FourCC("M", "J", "P", "G"),
-        "mjpeg/mp4": FourCC("M", "J", "P", "G"),
-        "h264/mkv": FourCC("H", "2", "6", "4"),
-        "avc1/mp4": FourCC("a", "v", "c", "1"),
-        "h264/mp4": FourCC("H", "2", "6", "4"),
-        "x264/mp4": FourCC("X", "2", "6", "4"),
-        "h264_nvenc/mp4": "h264_nvenc",
-    }
+    _cv2_fmts = FMT_TO_CODEC
 
     _DEFAULT_CHUNKSIZE = 10000
 
@@ -1496,10 +1488,26 @@ class VideoImgStore(_ImgStore, ImgStoreExport):
                 os.path.join(self._basedir, "%06d" % old)
             )
 
+        # NOTE
+        # 2022-03-28
+        # A weird bug is happening which prevents the ffmpeg process
+        # used by cv2cuda.VideoWriter from terminating
+        # when new==0 i.e. in the first chunk
+        # This causes the ffmpeg process to remain defuncted for the whole recording
+        # which can occupy one of the slots in the GPU,
+        # potentially depriving future ffmpeg processes from using it
+        # The "solution", for now, is to force the standard cv2.VideoWriter
+        # for the first chunk 
+        if new == 0:
+            self._original_codec = self._codec
+            self._codec = self._cv2_fmts["mjpeg/avi"]
+        elif new == 1:
+            self._codec = self._original_codec
+
         if new is not None:
             fn = os.path.join(self._basedir, "%06d%s" % (new, self._ext))
             h, w = self._imgshape[:2]
-            try:
+            try:          
 
                 if self._codec == "h264_nvenc":
 
