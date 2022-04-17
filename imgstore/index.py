@@ -1,8 +1,9 @@
 import os.path
 import sqlite3
 import logging
+import itertools
 import operator
-
+import hashlib
 import yaml
 import numpy as np
 
@@ -44,8 +45,11 @@ class ImgStoreIndex(object):
 
     log = log
 
-    def __init__(self, db=None):
+    def __init__(self, db=None, path=None, chunk_n_and_chunk_paths=None):
         self._conn = db
+        self._path = path
+        self._chunk_n_and_chunk_paths = chunk_n_and_chunk_paths
+
 
         cur = self._conn.cursor()
         cur.execute("pragma query_only = ON;")
@@ -113,6 +117,8 @@ class ImgStoreIndex(object):
         db = sqlite3.connect(":memory:", check_same_thread=False)
         cls.create_database(db)
 
+
+
         frame_count = 0
         frame_max = -np.inf
         frame_min = np.inf
@@ -175,12 +181,13 @@ class ImgStoreIndex(object):
 
         db.commit()
 
-        return cls(db)
+        path = os.path.dirname(chunk_n_and_chunk_paths[0][1])
+        return cls(db=db, path=path, chunk_n_and_chunk_paths=chunk_n_and_chunk_paths)
 
     @classmethod
     def new_from_file(cls, path):
         db = sqlite3.connect(path, check_same_thread=False)
-        return cls(db)
+        return cls(db, path=path, chunk_n_and_chunk_paths=None)
 
     @staticmethod
     def _get_metadata(cur, var_names):
@@ -279,11 +286,25 @@ class ImgStoreIndex(object):
 
     @property
     def chunk_index(self):
+
+        cache_dir = os.path.join(self._path, "cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        data = sorted(self._chunk_n_and_chunk_paths, key=lambda x: x[0])
+        hashable = "".join([str(e) for e in list(itertools.chain(*data))])
+        hash_res = hashlib.md5(hashable.encode()).hexdigest()
+        cached_index = os.path.join(cache_dir, f"chunk_index_{hash_res}.npy")
+        print(cached_index)
+
         if self._chunk_index is None:
-            self._chunk_index = {
-                "frame_number": {chunk: self.get_chunk_interval(chunk, "frame_number") for chunk in self._chunks},
-                "frame_time": {chunk: self.get_chunk_interval(chunk, "frame_time") for chunk in self._chunks}
-            }
+
+            if os.path.exists(cached_index):
+                self._chunk_index = np.load(cached_index, allow_pickle=True).item()
+            else:
+                self._chunk_index = {
+                    "frame_number": {chunk: self.get_chunk_interval(chunk, "frame_number") for chunk in self._chunks},
+                    "frame_time": {chunk: self.get_chunk_interval(chunk, "frame_time") for chunk in self._chunks}
+                }
+                np.save(cached_index, self._chunk_index)
 
         return self._chunk_index
 
