@@ -816,7 +816,7 @@ class _ImgStore(CV2Compat):
         self._tN = frame_time
 
         self._frame_n += 1
-        if (self._frame_n % self._chunksize) == 0:
+        if self._check_chunk_complete():
             old = self._chunk_n
             new = self._chunk_n + 1
             self._save_chunk(old, new)
@@ -824,6 +824,10 @@ class _ImgStore(CV2Compat):
             self.frame_in_chunk = 0
 
         self.frame_count = self._frame_n
+
+    def _check_chunk_complete(self):
+        return (self._chunk_n == 0 and (self._frame_n % 500) == 0) or \
+            (self._frame_n % self._chunksize) == 0
 
     def _get_next_framenumber_and_chunk_frame_idx(self):
         idx = self._chunk_current_frame_idx + 1
