@@ -1,0 +1,262 @@
+import logging
+import shutil
+import os.path
+import glob
+import operator
+
+import cv2
+
+from imgstore.constants import STORE_MD_KEY
+from imgstore.util import FourCC, ensure_color, ensure_grayscale
+from imgstore.stores.base import _ImgStore
+
+class VideoImgStore(_ImgStore):
+    _supported_modes = 'wr'
+
+    _cv2_fmts = {'mjpeg': FourCC('M', 'J', 'P', 'G'),
+                 'mjpeg/avi': FourCC('M', 'J', 'P', 'G'),
+                 'h264/mkv': FourCC('H', '2', '6', '4'),
+                 'avc1/mp4': FourCC('a', 'v', 'c', '1')}
+
+    _DEFAULT_CHUNKSIZE = 10000
+
+    def __init__(self, **kwargs):
+
+        self._cap = None
+        self._capfn = None
+
+        fmt = kwargs.get('format')
+        # backwards compat
+        if fmt == 'mjpeg':
+            kwargs['format'] = fmt = 'mjpeg/avi'
+
+        # default to seeking enable
+        seek = kwargs.pop('seek', True)
+        # keep compat with VideoImgStoreFFMPEG
+        kwargs.pop('gpu_id', None)
+
+        if kwargs['mode'] == 'w':
+            imgshape = kwargs['imgshape']
+
+            if 'chunksize' not in kwargs:
+                kwargs['chunksize'] = self._DEFAULT_CHUNKSIZE
+
+            try:
+                self._codec = self._cv2_fmts[fmt]
+            except KeyError:
+                raise ValueError('only %r supported', (self._cv2_fmts.keys(),))
+
+            self._color = (imgshape[-1] == 3) & (len(imgshape) == 3)
+
+            metadata = kwargs.get('metadata', {})
+            metadata[STORE_MD_KEY] = {'extension': '.%s' % fmt.split('/')[1]}
+            kwargs['metadata'] = metadata
+            kwargs['encoding'] = kwargs.pop('encoding', None)
+
+        _ImgStore.__init__(self, **kwargs)
+
+        self._supports_seeking = seek
+        if self._supports_seeking:
+            self._log.info('seeking enabled on store')
+        else:
+            self._log.info('seeking NOT enabled on store (will fallback to sequential reading)')
+
+        if self._mode == 'r':
+            if self.supports_format(self._format) or \
+                    ((self._metadata.get('class') == 'VideoImgStoreFFMPEG') and
+                     (('264' in self._format) or ('nvenc-' in self._format))):
+                check_imgshape = self._calculate_written_image_shape(self._imgshape, '')
+            else:
+                check_imgshape = tuple(self._imgshape)
+
+            if check_imgshape != self._imgshape:
+                self._log.warn('previous store had incorrect image_shape: corrected %r -> %r' % (
+                    self._imgshape, check_imgshape))
+                self._imgshape = check_imgshape
+            self._color = (self._imgshape[-1] == 3) & (len(self._imgshape) == 3)
+
+        self._log.info("store is native color: %s (or grayscale with encoding: '%s')" % (self._color, self._encoding))
+
+    def _readability_check(self, smd_class, smd_version):
+        can_read = {'VideoImgStoreFFMPEG', 'VideoImgStore',
+                    getattr(self, 'class_name', self.__class__.__name__)}
+        if smd_class not in can_read:
+            raise ValueError('incompatible store, can_read:%r opened:%r' % (can_read, smd_class))
+        if smd_version != self._version:
+            raise ValueError('incompatible store version')
+        return True
+
+    def _calculate_written_image_shape(self, imgshape, fmt):
+        _imgshape = list(imgshape)
+        # bitwise and with -2 truncates downwards to even
+        _imgshape[0] = int(_imgshape[0]) & -2
+        _imgshape[1] = int(_imgshape[1]) & -2
+        return tuple(_imgshape)
+
+    @staticmethod
+    def _get_chunk_extension(metadata):
+        # forward compatibility
+        try:
+            return metadata['extension']
+        except KeyError:
+            # backward compatibility with old mjpeg stores
+            if metadata['format'] == 'mjpeg':
+                return '.avi'
+            # backwards compatibility with old bview/motif stores
+            return '.mp4'
+
+    @property
+    def _ext(self):
+        return self._get_chunk_extension(self._metadata)
+
+    @property
+    def _chunk_paths(self):
+        ext = self._ext
+        return ['%s%s' % (p[1], ext) for p in self._chunk_n_and_chunk_paths]
+
+    def _find_chunks(self, chunk_numbers):
+        if chunk_numbers is None:
+            avis = map(os.path.basename, glob.glob(os.path.join(self._basedir, '*%s' % self._ext)))
+            chunk_numbers = list(map(int, map(operator.itemgetter(0), map(os.path.splitext, avis))))
+        return list(zip(chunk_numbers, tuple(os.path.join(self._basedir, '%06d' % n) for n in chunk_numbers)))
+
+    def _save_image(self, img, frame_number, frame_time):
+        # we always write color because its more supported
+        frame = ensure_color(img)
+        self._cap.write(frame)
+        if not os.path.isfile(self._capfn):
+            raise Exception('Your opencv build does support writing this codec')
+        self._save_image_metadata(frame_number, frame_time)
+
+    def _save_chunk(self, old, new):
+        if self._cap is not None:
+            self._cap.release()
+            self._save_chunk_metadata(os.path.join(self._basedir, '%06d' % old))
+
+        if new is not None:
+            fn = os.path.join(self._basedir, '%06d%s' % (new, self._ext))
+            h, w = self._imgshape[:2]
+            try:
+                self._cap = cv2.VideoWriter(filename=fn,
+                                            apiPreference=cv2.CAP_FFMPEG,
+                                            fourcc=self._codec,
+                                            fps=25,
+                                            frameSize=(w, h),
+                                            isColor=True)
+            except TypeError:
+                self._log.error('old (< 3.2) cv2 not supported (this is %r)' % (cv2.__version__,))
+                self._cap = cv2.VideoWriter(filename=fn,
+                                            fourcc=self._codec,
+                                            fps=25,
+                                            frameSize=(w, h),
+                                            isColor=True)
+
+            self._capfn = fn
+            self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
+
+    def _load_image(self, idx):
+        if self._supports_seeking:
+            # only seek if we have to, otherwise take the fast path
+            if (idx - self._chunk_current_frame_idx) != 1:
+                self._cap.set(getattr(cv2, "CAP_PROP_POS_FRAMES", 1), idx)
+        else:
+            if idx <= self._chunk_current_frame_idx:
+                self._load_chunk(self._chunk_n, _force=True)
+
+            i = self._chunk_current_frame_idx + 1
+            while i < idx:
+                _, img = self._cap.read()
+                i += 1
+
+        _, _img = self._cap.read()
+        if self._color:
+            # almost certainly no-op as opencv usually returns color frames....
+            img = ensure_color(_img)
+        else:
+            img = ensure_grayscale(_img)
+
+        return img, (self._chunk_md['frame_number'][idx], self._chunk_md['frame_time'][idx])
+
+    def _load_chunk(self, n, _force=False):
+        fn = os.path.join(self._basedir, '%06d%s' % (n, self._ext))
+        if _force or (fn != self._capfn):
+            if self._cap is not None:
+                self._cap.release()
+
+            self._log.debug('loading chunk %s' % n)
+            self._capfn = fn
+            # noinspection PyArgumentList
+            self._cap = cv2.VideoCapture(self._capfn)
+            self._chunk_current_frame_idx = -1
+
+            if not self._cap.isOpened():
+                raise Exception("OpenCV unable to open %s" % fn)
+
+            self._chunk_md = self._index.get_chunk_metadata(n)
+
+        self._chunk_n = n
+
+    @classmethod
+    def supported_formats(cls):
+        # remove the duplicate
+        fmts = list(cls._cv2_fmts.keys())
+        fmts.remove('mjpeg')
+        return fmts
+
+    @classmethod
+    def supports_format(cls, fmt):
+        return fmt in cls._cv2_fmts
+
+    @staticmethod
+    def _extract_only_frame(basedir, chunk_n, frame_n, smd):
+        capfn = os.path.join(basedir, '%06d%s' % (chunk_n,
+                                                  VideoImgStore._get_chunk_extension(smd)))
+        # noinspection PyArgumentList
+        cap = cv2.VideoCapture(capfn)
+
+        if _VERBOSE_DEBUG_CHUNKS:
+            log = logging.getLogger('imgstore')
+            log.debug('opening %s chunk %d frame_idx %d' % (capfn, chunk_n, frame_n))
+
+        try:
+            if frame_n > 0:
+                cap.set(getattr(cv2, "CAP_PROP_POS_FRAMES", 1), frame_n)
+            _, img = cap.read()
+            return img
+        finally:
+            cap.release()
+
+    @property
+    def lossless(self):
+        return False
+
+    def close(self, **kwargs):
+        super(VideoImgStore, self).close(**kwargs)
+        if self._cap is not None:
+            self._cap.release()
+            self._cap = None
+            self._capfn = None
+
+    def empty(self):
+        _ImgStore.empty(self)
+        # use find_chunks because it removes also invalid chunks
+        for _, chunk_path in self._find_chunks(chunk_numbers=None):
+            os.unlink(chunk_path + self._ext)
+            self._remove_index(chunk_path)
+
+    def insert_chunk(self, video_path, frame_numbers, frame_times, move=True):
+        assert len(frame_numbers) == len(frame_times)
+        assert video_path.endswith(self._ext)
+
+        self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % self._chunk_n))
+        self._chunk_md['frame_number'] = np.asarray(frame_numbers)
+        self._chunk_md['frame_time'] = np.asarray(frame_times)
+        self._save_chunk_metadata(os.path.join(self._basedir, '%06d' % self._chunk_n))
+
+        vid = os.path.join(self._basedir, '%06d%s' % (self._chunk_n, self._ext))
+        if move:
+            shutil.move(video_path, vid)
+        else:
+            shutil.copy(video_path, vid)
+
+        self._chunk_n += 1
