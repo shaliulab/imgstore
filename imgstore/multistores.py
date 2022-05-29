@@ -1,11 +1,13 @@
 import os.path
 import logging
+import time
 import traceback
 import glob
 import datetime
 import pandas as pd
 import numpy as np
 import cv2
+
 from cv2 import (
     CAP_PROP_FRAME_WIDTH,
     CAP_PROP_FRAME_HEIGHT,
@@ -99,11 +101,15 @@ class MultiStore:
 
         main_store = store_list[0]
 
+        logger.debug(f"Opening main store {main_store}")
+        before = time.time()
         self._stores = [new_for_filename(
             main_store,
             chunk_numbers=chunk_numbers,
             **kwargs
         )]
+        after=time.time()
+        logger.debug(f"Done in {after-before} seconds")
 
         self._data_interval = None
 
@@ -120,13 +126,15 @@ class MultiStore:
         self._main_store._load_chunk(ref_chunk)
         self._main_store.reset_to_first_frame()
 
-        self._stores.extend([
-            new_for_filename(store_path, **kwargs)
-            for store_path in store_list[1:]
-        ])
+        for store_path in store_list[1:]:
+            logger.debug(f"Opening {store_path}")
+            before=time.time()
+            self._stores.extend([new_for_filename(store_path, **kwargs)])
+            after=time.time()
+            logger.debug(f"Done in {after-before} seconds")
 
         for store in self._stores:
-            logger.info(f"Computing chunk index of {store}")
+            logger.debug(f"Computing chunk index of {store}")
             _ = store._index.chunk_index
 
         self._store_list = sorted(
@@ -153,7 +161,11 @@ class MultiStore:
                 store for store in self._store_list
             ], key=lambda x: x._metadata["framerate"]
         )[-1]
+        logger.debug(f"Computing cross index")
+        before=time.time()
         self.get_crossindex()
+        after=time.time()
+        logger.debug(f"Done in {after-before} seconds")
 
 
     @property
