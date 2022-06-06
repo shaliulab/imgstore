@@ -198,3 +198,13 @@ class ImgStoreIndex(object):
         cur.execute("SELECT chunk, frame_idx FROM frames ORDER BY ABS(? - {}) LIMIT 1;".format(what), (value, ))
         chunk_n, frame_idx = cur.fetchone()
         return chunk_n, frame_idx
+
+    def find_all(self, what, value, exact_only=True):
+        assert what in ('frame_number', 'frame_time')
+        cur = self._conn.cursor()
+        if exact_only:
+            cur.execute("SELECT * FROM frames WHERE {} = ?;".format(what), (value, ))
+        else:
+            cur.execute("SELECT * FROM frames ORDER BY ABS(? - {}) LIMIT 1;".format(what), (value, ))
+        data = cur.fetchone()
+        return data
