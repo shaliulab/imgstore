@@ -5,18 +5,15 @@ import glob
 import operator
 
 import cv2
-
-from imgstore.constants import STORE_MD_KEY
-from imgstore.util import FourCC, ensure_color, ensure_grayscale
+import numpy as np
+from imgstore.constants import STORE_MD_KEY, VERBOSE_DEBUG_CHUNKS
+from imgstore.util import ensure_color, ensure_grayscale
+from imgstore.stores.utils.formats import get_formats
 from imgstore.stores.base import _ImgStore
 
 class VideoImgStore(_ImgStore):
     _supported_modes = 'wr'
-
-    _cv2_fmts = {'mjpeg': FourCC('M', 'J', 'P', 'G'),
-                 'mjpeg/avi': FourCC('M', 'J', 'P', 'G'),
-                 'h264/mkv': FourCC('H', '2', '6', '4'),
-                 'avc1/mp4': FourCC('a', 'v', 'c', '1')}
+    _cv2_fmts = get_formats(cache=True)
 
     _DEFAULT_CHUNKSIZE = 10000
 
@@ -200,7 +197,6 @@ class VideoImgStore(_ImgStore):
     def supported_formats(cls):
         # remove the duplicate
         fmts = list(cls._cv2_fmts.keys())
-        fmts.remove('mjpeg')
         return fmts
 
     @classmethod
@@ -214,7 +210,7 @@ class VideoImgStore(_ImgStore):
         # noinspection PyArgumentList
         cap = cv2.VideoCapture(capfn)
 
-        if _VERBOSE_DEBUG_CHUNKS:
+        if VERBOSE_DEBUG_CHUNKS:
             log = logging.getLogger('imgstore')
             log.debug('opening %s chunk %d frame_idx %d' % (capfn, chunk_n, frame_n))
 

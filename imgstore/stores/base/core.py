@@ -15,6 +15,8 @@ from imgstore.index import ImgStoreIndex
 from imgstore.stores.utils.logging import _Log
 from imgstore.stores.utils.path import get_fullpath
 from imgstore.stores.utils.datetime import parse_old_time, parse_new_time
+from imgstore.stores.base.write import WritingStore
+from imgstore.stores.base.read import ReadingStore
 
 _VERBOSE_VERY = False  # overrides the other and prints all logs to stdout
 
@@ -111,7 +113,7 @@ class AbstractImgStore(AbstractStore):
 
 
 
-class _ImgStore(AbstractImgStore, *MIXINS):
+class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
     _version = 2
     _supported_modes = ''
 
@@ -155,7 +157,7 @@ class _ImgStore(AbstractImgStore, *MIXINS):
 
         self._log = logging.getLogger('imgstore')
         if _VERBOSE_VERY:
-            _VERBOSE_DEBUG_GETS = _VERBOSE_DEBUG_CHUNKS = True
+            _VERBOSE_DEBUG_GETS = VERBOSE_DEBUG_CHUNKS = True
             self._log = _Log
 
         self._chunk_n = 0
@@ -261,3 +263,5 @@ class _ImgStore(AbstractImgStore, *MIXINS):
             self._extra_data_fp = self._extra_data_fn = None
 
         self._frame_n = 0
+
+__all__ = [_ImgStore]

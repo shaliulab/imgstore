@@ -8,6 +8,9 @@ from .stores import new_for_filename, get_supported_formats, new_for_format
 from .ui import new_window
 from .util import motif_get_parse_true_fps
 
+from imgstore.stores.utils.formats import get_formats
+
+
 _log = logging.getLogger('imgstore.apps')
 
 

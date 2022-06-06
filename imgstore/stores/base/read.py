@@ -45,7 +45,7 @@ class ReadingStore(abc.ABC):
         else:
             _dt = dateutil.parser.parse(smd['created_utc'])
             self._log.debug('parsed created_utc: %s (from %r)' % (_dt.isoformat(), _dt))
-            dt, tz = parse_new_time(smd, dt)
+            dt, tz = parse_new_time(smd, _dt)
 
         self._created_utc = dt
         self._timezone_local = tz

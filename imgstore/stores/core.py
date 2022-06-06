@@ -3,6 +3,7 @@ import yaml
 from imgstore.constants import STORE_MD_FILENAME, STORE_MD_KEY
 from imgstore.stores.video import VideoImgStore
 from imgstore.stores.directory import DirectoryImgStore
+from imgstore.stores.utils.mixins.extract import _extract_store_metadata
 
 def _parse_basedir_fullpath(path, basedir, read):
     # the API is not so clean that we support both path and basedir, but we have to keep

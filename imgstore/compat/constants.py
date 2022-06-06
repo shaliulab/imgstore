@@ -1,5 +1,3 @@
-import os.path
-
 try:
     # python 3
     # noinspection PyProtectedMember
@@ -19,5 +17,3 @@ STORE_INDEX_FILENAME = '.index.sqlite'
 EXTRA_DATA_FILE_EXTENSIONS = ('.extra.json', '.extra_data.json', '.extra_data.h5')
 
 FRAME_MD = ('frame_number', 'frame_time')
-VERBOSE_DEBUG_CHUNKS=False
-CONFIG_FILE=os.path.join(os.environ["HOME"], ".config", "imgstore", "imgstore.yml")
