@@ -22,19 +22,18 @@ import tzlocal
 import dateutil.parser
 
 try:
-    import bloscpack
+    import bloscpack # type: ignore
 except ImportError:
     bloscpack = None
 
 from .constants import DEVNULL, STORE_MD_FILENAME, STORE_LOCK_FILENAME, STORE_MD_KEY, \
-    STORE_INDEX_FILENAME, EXTRA_DATA_FILE_EXTENSIONS, FRAME_MD as _FRAME_MD
+    STORE_INDEX_FILENAME, EXTRA_DATA_FILE_EXTENSIONS, FRAME_MD as _FRAME_MD, VERBOSE_DEBUG_CHUNKS
 from .util import ImageCodecProcessor, JsonCustomEncoder, FourCC, ensure_color,\
     ensure_grayscale, motif_extra_data_h5_to_df, motif_extra_data_json_to_df, motif_extra_data_h5_attrs
 from .index import ImgStoreIndex
 
 
 _VERBOSE_DEBUG_GETS = False
-_VERBOSE_DEBUG_CHUNKS = False
 _VERBOSE_VERY = False  # overrides the other and prints all logs to stdout
 
 
@@ -102,7 +101,7 @@ class _ImgStore(object):
 
         self._log = logging.getLogger('imgstore')
         if _VERBOSE_VERY:
-            _VERBOSE_DEBUG_GETS = _VERBOSE_DEBUG_CHUNKS = True
+            _VERBOSE_DEBUG_GETS = VERBOSE_DEBUG_CHUNKS = True
             self._log = _Log
 
         self._chunk_n = 0
@@ -645,7 +644,7 @@ class _ImgStore(object):
         if frame_index < 0:
             raise ValueError('seeking to negative index not supported')
 
-        if _VERBOSE_DEBUG_CHUNKS:
+        if VERBOSE_DEBUG_CHUNKS:
             self._log.debug('seek by frame_index %s' % frame_index)
 
         chunk_n, frame_idx = self._index.find_chunk('index', frame_index)
@@ -658,7 +657,7 @@ class _ImgStore(object):
         return self._get_image(chunk_n, frame_idx)
 
     def _get_image_by_frame_number(self, frame_number, exact_only):
-        if _VERBOSE_DEBUG_CHUNKS:
+        if VERBOSE_DEBUG_CHUNKS:
             self._log.debug('seek by frame_number %s (exact: %s)' % (frame_number, exact_only))
 
         if exact_only:
@@ -1147,7 +1146,7 @@ class VideoImgStore(_ImgStore):
         # noinspection PyArgumentList
         cap = cv2.VideoCapture(capfn)
 
-        if _VERBOSE_DEBUG_CHUNKS:
+        if VERBOSE_DEBUG_CHUNKS:
             log = logging.getLogger('imgstore')
             log.debug('opening %s chunk %d frame_idx %d' % (capfn, chunk_n, frame_n))
 
