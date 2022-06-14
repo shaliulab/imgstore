@@ -1,4 +1,5 @@
 import warnings
+import os.path
 import logging
 import numpy as np
 import cv2
@@ -23,8 +24,8 @@ class MultiStore(ContextManagerMixin):
         self._index = None
 
     def close(self):
-        for store_name, store in self._stores.items():
-            store.close()
+        for store_name in self._stores:
+            self._stores[store_name].close()
 
 
     def _apply_layout(imgs):
@@ -122,13 +123,44 @@ class MultiStore(ContextManagerMixin):
         return self.get_nearest_image(frame_time)
 
 
-def new_for_filename(path, **kwargs):  
-    stores = {"master": new_for_filename_single(path, **kwargs)}
- 
-    metadata = _extract_store_metadata(path)
-    for cameras in metadata.get("extra_cameras", []):
-        stores[cameras] = new_for_filename_single(cameras, **kwargs)
+    @classmethod
+    def new_for_filename(cls, *args, **kwargs):
+        return new_for_filename(*args, **kwargs)
 
+def load_extra_cameras(path, **kwargs):
+    """
+    Load the stores listed in metadata.yaml (available in path) under key extra_cameras,
+    and return them as a dictionary where the keys are the listed paths
+
+    Arguments:
+
+        * path (str): Path to an imgstore folder or the metadata.yaml inside it
+        **kwargs (dict): Arguments to new_for_filename_single
+    """
+
+    METADATA_KEY="extra_cameras"
+
+    stores = {}
+
+    metadata = _extract_store_metadata(path)
+    for camera in metadata.get(METADATA_KEY, []):
+        try:
+            stores[camera] = new_for_filename_single(camera, **kwargs)
+        except FileNotFoundError:
+            if os.path.isfile(path):
+                master_path = os.path.dirname(path)
+            else:
+                master_path = path
+
+            camera = os.path.join(master_path, camera)
+            assert os.path.exists(camera), f"{master_path} does not exist"
+            stores[camera] = new_for_filename_single(camera, **kwargs)
+
+    return stores
+
+def new_for_filename(path, **kwargs):
+    stores = {"master": new_for_filename_single(path, **kwargs)}
+    stores.update(load_extra_cameras(path, **kwargs))
     multistore = MultiStore(**stores)
     return multistore
 
