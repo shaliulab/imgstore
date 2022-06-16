@@ -2,6 +2,7 @@
 from __future__ import print_function, division, absolute_import
 
 import os.path
+import warnings
 import operator
 import time
 import logging
@@ -206,6 +207,19 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
     def _calculate_written_image_shape(self, imgshape, fmt):
         # TODO: This can surely be removed?
         return imgshape
+
+    def frame_number2frame_index(self, frame_number, chunk=None):
+        if chunk:
+            try:
+                return self._get_chunk_metadata(chunk)["frame_number"].index(frame_number)
+
+            except ValueError:
+                warnings.warn(f"{frame_number} not found in {self}-{chunk}")
+                return
+
+        else:
+            return self._index.find_chunk("frame_number", frame_number)[1]
+
 
     @classmethod
     def supports_format(cls, fmt):
