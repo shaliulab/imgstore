@@ -12,7 +12,7 @@ with open(op.join(this_directory, 'README.md'), 'rb') as f:
     long_description = f.read().decode('UTF-8')
 
 setup(
-    name='imgstore',
+    name='imgstore-shaliulab',
     license='BSD 3 clause',
     description='IMGStore houses your video frames',
     long_description=long_description,
