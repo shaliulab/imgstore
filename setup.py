@@ -43,6 +43,7 @@ setup(
         'pytz',
         'tzlocal',
         'python-dateutil',
+        'cv2cuda>=1.0.4'
     ],
     tests_require=[
         'pytest',
@@ -57,7 +58,7 @@ setup(
             'imgstore-view = imgstore.apps:main_viewer',
             'imgstore-save = imgstore.apps:main_saver',
             'imgstore-test = imgstore.apps:main_test',
-            'imgstore-codecs = imgstore.apps:get_formats',
+            'imgstore-codecs = imgstore.apps:list_codecs',
         ]
     },
 )
