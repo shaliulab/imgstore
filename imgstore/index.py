@@ -1,12 +1,14 @@
+from importlib.resources import path
 import os.path
 import sqlite3
 import logging
 import operator
+import warnings
 
 import yaml
 import numpy as np
 
-from .constants import FRAME_MD
+from .constants import FRAME_MD, SQLITE3_INDEX_FILE
 
 
 def _load_index(path_without_extension):
@@ -34,6 +36,7 @@ class ImgStoreIndex(object):
 
     def __init__(self, db=None):
         self._conn = db
+        self.path=None
 
         cur = self._conn.cursor()
         cur.execute('pragma query_only = ON;')
@@ -46,15 +49,12 @@ class ImgStoreIndex(object):
         cur.execute('SELECT COUNT(1) FROM frames')
         self.frame_count, = cur.fetchone()
 
-        def _summary(_what):
-            cur.execute('SELECT value FROM summary WHERE name = ?', (_what,))
-            return cur.fetchone()[0]
 
         if self.frame_count:
-            self.frame_time_max = _summary('frame_time_max')
-            self.frame_time_min = _summary('frame_time_min')
-            self.frame_max = _summary('frame_max')
-            self.frame_min = _summary('frame_min')
+            self.frame_time_max = self._summary('frame_time_max')
+            self.frame_time_min = self._summary('frame_time_min')
+            self.frame_max = self._summary('frame_max')
+            self.frame_min = self._summary('frame_min')
 
             # keep back compat for nan as types (inf -> nan)
             if not np.isreal(self.frame_max):
@@ -70,6 +70,83 @@ class ImgStoreIndex(object):
         # # all chunks in the store [0,1,2, ... ]
         cur.execute('SELECT chunk FROM chunks ORDER BY chunk;')
         self._chunks = tuple(row[0] for row in cur)
+
+    def _summary(self, _what):
+        cur = self._conn.cursor()
+        cur.execute('SELECT value FROM summary WHERE name = ?', (_what,))
+        return cur.fetchone()[0]
+
+
+    @classmethod
+    def read_records(cls, chunk_n_and_chunk_paths):
+            records = []
+            frame_count = 0
+            frame_max = -np.inf
+            frame_min = np.inf
+            frame_time_max = -np.inf
+            frame_time_min = np.inf
+            chunks = []
+
+            for chunk_n, chunk_path in sorted(chunk_n_and_chunk_paths, key=operator.itemgetter(0)):
+                try:
+                    idx = _load_index(chunk_path)
+                except IOError:
+                    cls.log.warn('missing index for chunk %s' % chunk_n)
+                    continue
+
+                if not idx['frame_number']:
+                    # empty chunk
+                    continue
+
+                frame_count += len(idx['frame_number'])
+                frame_time_min = min(frame_time_min, np.min(idx['frame_time']))
+                frame_time_max = max(frame_time_max, np.max(idx['frame_time']))
+                frame_min = min(frame_min, np.min(idx['frame_number']))
+                frame_max = max(frame_max, np.max(idx['frame_number']))
+
+                try:
+                    records += [(chunk_n, i, fn, ft) for i, (fn, ft) in enumerate(zip(idx['frame_number'],
+                                                                                        idx['frame_time']))]
+                    chunks += [(chunk_n, chunk_path)]
+                except TypeError:
+                    cls.log.error('corrupt chunk', exc_info=True)
+                    continue
+            
+            return records, chunks, (frame_min, frame_max, frame_time_min, frame_time_max)
+
+
+    @classmethod
+    def populate_database(cls, path, records_and_stats):
+        
+        records, chunks, stats = records_and_stats
+        (frame_min, frame_max, frame_time_min, frame_time_max) = stats
+
+        db = sqlite3.connect(path, check_same_thread=False)
+
+        cls.create_database(db)
+        cur = db.cursor()
+
+        cur.executemany('INSERT INTO frames VALUES (?,?,?,?)', records)
+
+        for i in range(len(chunks)):
+            cur.execute('INSERT INTO chunks VALUES (?, ?)', chunks[i])
+            db.commit()
+
+        cur.execute('INSERT INTO summary VALUES (?,?)', ('frame_time_min', float(frame_time_min)))
+        cur.execute('INSERT INTO summary VALUES (?,?)', ('frame_time_max', float(frame_time_max)))
+        cur.execute('INSERT INTO summary VALUES (?,?)', ('frame_min', float(frame_min)))
+        cur.execute('INSERT INTO summary VALUES (?,?)', ('frame_max', float(frame_max)))
+        db.commit()
+        return db
+            
+    @classmethod
+    def read_index_and_populate_database(cls, chunk_n_and_chunk_paths):
+        path = os.path.join(os.path.dirname(chunk_n_and_chunk_paths[0][1]), SQLITE3_INDEX_FILE)
+        records_and_stats = cls.read_records(chunk_n_and_chunk_paths)
+        cls.populate_database(path, records_and_stats)
+        db=cls.populate_database(':memory:', records_and_stats)
+        return db, path
+
 
     @classmethod
     def create_database(cls, conn):
@@ -89,6 +166,13 @@ class ImgStoreIndex(object):
 
     @classmethod
     def new_from_chunks(cls, chunk_n_and_chunk_paths):
+        db, path=cls.read_index_and_populate_database(chunk_n_and_chunk_paths)
+        index=cls(db)
+        index.path=path
+        return index
+
+    @classmethod
+    def new_from_chunks_old(cls, chunk_n_and_chunk_paths):
         db = sqlite3.connect(':memory:', check_same_thread=False)
         cls.create_database(db)
 
@@ -138,10 +222,13 @@ class ImgStoreIndex(object):
 
         return cls(db)
 
+
     @classmethod
     def new_from_file(cls, path):
         db = sqlite3.connect(path, check_same_thread=False)
-        return cls(db)
+        index=cls(db)
+        index.path=path
+        return index
 
     @staticmethod
     def _get_metadata(cur):
@@ -207,4 +294,14 @@ class ImgStoreIndex(object):
         else:
             cur.execute("SELECT * FROM frames ORDER BY ABS(? - {}) LIMIT 1;".format(what), (value, ))
         data = cur.fetchone()
+        if data is None:
+
+            if what == "frame_number":
+                _what=["frame_min", "frame_max"]
+            elif what == "frame_time":
+                _what =["frame_time_min", "frame_time_max"]
+            error_msg=f"Cannot find {what} set to {value}\n"
+            for w in _what:
+                error_msg+=f"{w}={str(self._summary(w))} "
+            raise Exception(error_msg)
         return data
