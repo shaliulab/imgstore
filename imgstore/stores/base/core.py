@@ -9,7 +9,7 @@ import logging
 import abc
 import numpy as np
 
-from imgstore.constants import DEVNULL, STORE_MD_FILENAME, STORE_LOCK_FILENAME, STORE_MD_KEY, \
+from imgstore.constants import DEVNULL, SQLITE3_INDEX_FILE, STORE_MD_FILENAME, STORE_LOCK_FILENAME, STORE_MD_KEY, \
     STORE_INDEX_FILENAME, EXTRA_DATA_FILE_EXTENSIONS, FRAME_MD as _FRAME_MD
 from imgstore.util import ImageCodecProcessor, JsonCustomEncoder, motif_extra_data_h5_to_df, motif_extra_data_json_to_df, motif_extra_data_h5_attrs
 from imgstore.index import ImgStoreIndex
@@ -121,7 +121,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
     FRAME_MD = _FRAME_MD
 
     # noinspection PyShadowingBuiltins
-    def __init__(self, basedir, mode, imgshape=None, imgdtype=np.uint8, chunksize=None, metadata=None,
+    def __init__(self, basedir, mode, fps=25, imgshape=None, imgdtype=np.uint8, chunksize=None, metadata=None,
                  encoding=None, write_encode_encoding=None, format=None, index=None):
         if mode not in self._supported_modes:
             raise ValueError('mode not supported')
@@ -131,6 +131,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
             imgdtype = np.dtype(imgdtype).name
 
         self._basedir = basedir
+        self._fps = fps
         self._mode = mode
         self._imgshape = ()
         self._imgdtype = ''
@@ -144,6 +145,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
 
         self._metadata = {}
         self._user_metadata = {}
+        self._frame_metadata = {}
 
         self._tN = self._t0 = time.time()
 
@@ -184,7 +186,15 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
                 self._chunk_n_and_chunk_paths = self._find_chunks(chunk_numbers=None)
                 self._log.debug('found %s chunks in in %fs' % (len(self._chunk_n_and_chunk_paths), time.time() - t0))
 
-                self._index = ImgStoreIndex.new_from_chunks(self._chunk_n_and_chunk_paths)
+                if self.index_db_exists:
+                    # NOTE:
+                    # This is a new feature that just performs a db connection
+                    # to a sqlite3 version of the npz files of the imgstore
+                    # (same info but in a single file)
+                    # instead of regenerating a sqlite3 db every time
+                    self._index = ImgStoreIndex.new_from_file(self.index_db_path)
+                else:
+                    self._index = ImgStoreIndex.new_from_chunks(self._chunk_n_and_chunk_paths)
             elif (index is not None) and isinstance(index, ImgStoreIndex):
                 self._log.debug('using supplied index')
                 self._index = index
@@ -202,6 +212,21 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
             assert self._chunk_current_frame_idx == -1
             assert self._chunk_n == 0
             self.frame_number = np.nan  # we haven't read any frames yet
+
+    def get_chunk(self, chunk):
+        first_fn=self._index.get_chunk_metadata(chunk)["frame_number"][0]
+        img, (frame_number, frame_time) = self.get_image(max(0, first_fn))
+        return img, (frame_number, frame_time)
+    
+
+    @property
+    def index_db_path(self):
+        return os.path.join(self._basedir, SQLITE3_INDEX_FILE)
+
+    @property
+    def index_db_exists(self):
+        return os.path.exists(self.index_db_path)
+
 
     # noinspection PyShadowingBuiltins,PyMethodMayBeStatic
     def _calculate_written_image_shape(self, imgshape, fmt):
