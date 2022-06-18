@@ -113,6 +113,11 @@ def main_test():
 
     pytest.main(['-v', os.path.join(os.path.abspath(os.path.dirname(__file__)), 'tests')])
 
+def list_codecs():
+    formats=get_formats(video=True, directory=True, raw=True, cache=False)
+    formats="\n".join([f for f in formats if formats[f]])
+    
+    return formats
 
 def generate_timecodes(store, dest_file):
     _ts = np.asarray(store.get_frame_metadata()['frame_time'])
