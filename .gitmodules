@@ -1,0 +1,3 @@
+[submodule "imgstore/tests/data"]
+	path = imgstore/tests/data
+	url = git@github.com:shaliulab/imgstore-data
