@@ -18,6 +18,9 @@ class GetMixin:
         return self._get_next_framenumber_and_chunk_frame_idx()[0]
 
     def get_nearest_image(self, frame_time):
+        """
+        :param frame_time: (int) Time of a given frame, in ms
+        """
         chunk_n, frame_idx = self._index.find_chunk_nearest('frame_time', frame_time)
         return self._get_image(chunk_n, frame_idx)
 
