@@ -15,8 +15,5 @@ def load_config():
 
 def save_config(config):
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-
-    print(config)
-
     with open(CONFIG_FILE, "w") as filehandle:
         yaml.dump(config, filehandle, yaml.SafeDumper)
