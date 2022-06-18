@@ -15,21 +15,36 @@ _VERBOSE_DEBUG_GETS = False
 # The master store frame always goes on the left
 # The selected store is the one that sets the time series i.e. the frame times available
 
-class MultiStore(ContextManagerMixin):
+class VideoImgStore(ContextManagerMixin):
 
     def __init__(self, **stores):
         self._stores = stores
         self._master = stores["master"]
-        self._selected = None
-        self._index = None
+        self._selected = stores.get("lowres/metadata.yaml", stores["master"])
+        self._selected_name = "master"
+        self._index = self._master._index
 
     def close(self):
         for store_name in self._stores:
             self._stores[store_name].close()
 
+    @property
+    def _capfn(self):
+        return self._master._capfn
 
+    @property
+    def full_path(self):
+        return self._master.full_path
+
+    @property
+    def _chunk_n(self):
+        return self._master._chunk_n
+
+    @staticmethod
     def _apply_layout(imgs):
-        
+
+        assert len(imgs) >= 1
+
         shape = imgs[0].shape
         reshaped_imgs=[]
 
@@ -75,7 +90,7 @@ class MultiStore(ContextManagerMixin):
             else:
                 img, _ = store.get_nearest_image(frame_time)
                 imgs.append(img)
-        
+       
         img = self._apply_layout(imgs)
         return img, meta
 
@@ -87,8 +102,8 @@ class MultiStore(ContextManagerMixin):
 
     def get_nearest_image(self, frame_time):
 
-        imgs = []
         master_img, selected_meta = self._master.get_nearest_image(frame_time)
+        imgs = [master_img]
 
         for store_name, store in self._stores.items():
             if store_name == "master":
@@ -116,11 +131,17 @@ class MultiStore(ContextManagerMixin):
         if _VERBOSE_DEBUG_GETS:
             self._log.debug('get_image %s (exact: %s) frame_idx %s' % (frame_number, exact_only, frame_index))
 
-        data = self._index.find_all("frame_number", frame_number, exact_only=exact_only)
-        # TODO How do we get the frame_time from data?
-        frame_time = data[1]
-
+        chunk, frame_idx, frame_number, frame_time = self._index.find_all("frame_number", frame_number, exact_only=exact_only)
         return self.get_nearest_image(frame_time)
+
+    def get_chunk(self, chunk):
+        _, (fn, ft) = self._master.get_chunk(chunk)
+        for store_name, store in self._stores.items():
+            if store_name == "master":
+                continue
+            else:
+                img, (fn, ft) = store.get_nearest_image(ft)
+                store.get_image(max(0, fn))
 
 
     @classmethod
@@ -161,7 +182,7 @@ def load_extra_cameras(path, **kwargs):
 def new_for_filename(path, **kwargs):
     stores = {"master": new_for_filename_single(path, **kwargs)}
     stores.update(load_extra_cameras(path, **kwargs))
-    multistore = MultiStore(**stores)
+    multistore = VideoImgStore(**stores)
     return multistore
 
 
