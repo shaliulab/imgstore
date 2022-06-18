@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 
-# Authors: John Stowers <john@loopbio.com>, Santi Villalba <santi@loopbio.com>
+# Authors: John Stowers <john@loopbio.com>, Santi Villalba <santi@loopbio.com>, Antonio Ortega <antonio.ortega@kuleuven.be>
 # Licence: BSD 3 clause
 
 import os.path as op
@@ -18,10 +18,10 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     include_package_data=True,
-    version='0.3.2',
-    url='https://github.com/loopbio/imgstore',
-    author='John Stowers, Santi Villalba',
-    author_email='john@loopbio.com, santi@loopbio.com',
+    version='0.4.0',
+    url='https://github.com/shaliulab/imgstore',
+    author='John Stowers, Santi Villalba', 'Antonio Ortega',
+    author_email='john@loopbio.com, santi@loopbio.com', 'antonio.ortega@kuleuven.be'
     packages=find_packages(),
     classifiers=[
         'Intended Audience :: Science/Research',
