@@ -3,6 +3,7 @@ import shutil
 import os.path
 import glob
 import operator
+import warnings
 
 import cv2
 import numpy as np
@@ -11,9 +12,18 @@ from imgstore.util import ensure_color, ensure_grayscale
 from imgstore.stores.utils.formats import get_formats
 from imgstore.stores.base import _ImgStore
 
+try:
+    import cv2cuda
+    CV2CUDA_AVAILABLE=True
+except Exception:
+    cv2cuda=None
+    CV2CUDA_AVAILABLE=False
+
+isColor=False
+
 class VideoImgStore(_ImgStore):
     _supported_modes = 'wr'
-    _cv2_fmts = get_formats(cache=True)
+    _cv2_fmts = get_formats(cache=True, video=True)
 
     _DEFAULT_CHUNKSIZE = 10000
 
@@ -21,6 +31,8 @@ class VideoImgStore(_ImgStore):
 
         self._cap = None
         self._capfn = None
+        self._last_capfn=None
+
 
         fmt = kwargs.get('format')
         # backwards compat
@@ -46,7 +58,12 @@ class VideoImgStore(_ImgStore):
             self._color = (imgshape[-1] == 3) & (len(imgshape) == 3)
 
             metadata = kwargs.get('metadata', {})
-            metadata[STORE_MD_KEY] = {'extension': '.%s' % fmt.split('/')[1]}
+            try:
+                metadata[STORE_MD_KEY] = {'extension': '.%s' % fmt.split('/')[1]}
+            except Exception as error:
+                warnings.warn(f"{fmt} is not splittable", stacklevel=2)
+                raise error
+                
             kwargs['metadata'] = metadata
             kwargs['encoding'] = kwargs.pop('encoding', None)
 
@@ -119,10 +136,20 @@ class VideoImgStore(_ImgStore):
 
     def _save_image(self, img, frame_number, frame_time):
         # we always write color because its more supported
-        frame = ensure_color(img)
+        if self._color:
+            frame = ensure_color(img)
+        else:
+            frame = ensure_grayscale(img)
+    
         self._cap.write(frame)
-        if not os.path.isfile(self._capfn):
-            raise Exception('Your opencv build does support writing this codec')
+        if self._chunk_current_frame_idx > 0 and not os.path.isfile(self._capfn):
+            raise Exception(
+                f"""
+                {self._capfn} could not be created.
+                Probably, your opencv build does support writing this codec ({self._codec})
+                """
+            )
+
         self._save_image_metadata(frame_number, frame_time)
 
     def _save_chunk(self, old, new):
@@ -134,19 +161,49 @@ class VideoImgStore(_ImgStore):
             fn = os.path.join(self._basedir, '%06d%s' % (new, self._ext))
             h, w = self._imgshape[:2]
             try:
-                self._cap = cv2.VideoWriter(filename=fn,
-                                            apiPreference=cv2.CAP_FFMPEG,
-                                            fourcc=self._codec,
-                                            fps=25,
-                                            frameSize=(w, h),
-                                            isColor=True)
-            except TypeError:
-                self._log.error('old (< 3.2) cv2 not supported (this is %r)' % (cv2.__version__,))
-                self._cap = cv2.VideoWriter(filename=fn,
-                                            fourcc=self._codec,
-                                            fps=25,
-                                            frameSize=(w, h),
-                                            isColor=True)
+                
+                if self._codec == "h264_nvenc" and not CV2CUDA_AVAILABLE:
+                    self._codec=self._cv2_fmts['avc1/mp4']
+
+
+                if self._codec == "h264_nvenc":
+                    self._cap = cv2cuda.VideoWriter(
+                        filename=fn,
+                        apiPreference="FFMPEG",
+                        fourcc="h264_nvenc",
+                        fps=self._fps,
+                        frameSize=(w, h),
+                        isColor=self._color
+                    )
+            
+                else:
+                    self._cap = cv2.VideoWriter(
+                        filename=fn,
+                        apiPreference=cv2.CAP_FFMPEG,
+                        fourcc=self._codec,
+                        fps=self._fps,
+                        frameSize=(w, h),
+                        isColor=self._color
+                    )
+
+            except TypeError as error:
+                self._log.error(
+                    f"""
+                    {error}
+                    old (< 3.2) cv2 not supported (this is {cv2.__version__})
+                    filename: {fn},
+                    fourcc: {self._codec},
+                    frameSize: {(w, h)},
+                    isColor: {self._color}
+                    """
+                )
+                self._cap = cv2.VideoWriter(
+                    filename=fn,
+                    fourcc=self._codec,
+                    fps=self._fps,
+                    frameSize=(w, h),
+                    isColor=self._color
+                )
 
             self._capfn = fn
             self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
@@ -165,7 +222,8 @@ class VideoImgStore(_ImgStore):
                 _, img = self._cap.read()
                 i += 1
 
-        _, _img = self._cap.read()
+        ret, _img = self._cap.read()
+        assert ret, f"Cannot read frame from {self._capfn}"
         if self._color:
             # almost certainly no-op as opencv usually returns color frames....
             img = ensure_color(_img)
@@ -231,6 +289,7 @@ class VideoImgStore(_ImgStore):
         if self._cap is not None:
             self._cap.release()
             self._cap = None
+            self._last_capfn=self._capfn
             self._capfn = None
 
     def empty(self):

@@ -5,20 +5,20 @@ import cv2
 import numpy as np
 
 try:
-    import bloscpack
+    import bloscpack # type: ignore
 except ImportError:
     bloscpack = None
 
 
 from imgstore.util import ensure_color, ensure_grayscale
 from imgstore.stores.base import _ImgStore
-
+from imgstore.stores.utils.formats import get_formats
 
 class DirectoryImgStore(_ImgStore):
     _supported_modes = 'wr'
 
-    _cv2_fmts = {'tif', 'png', 'jpg', 'ppm', 'pgm', 'bmp'}
-    _raw_fmts = {'npy', 'bpk'}
+    _cv2_fmts = get_formats(cache=True, directory=True)
+    _raw_fmts = get_formats(cache=True, raw=True)
 
     _DEFAULT_CHUNKSIZE = 200
 
