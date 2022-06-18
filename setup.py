@@ -21,7 +21,7 @@ setup(
     version='0.4.0',
     url='https://github.com/shaliulab/imgstore',
     author='John Stowers, Santi Villalba', 'Antonio Ortega',
-    author_email='john@loopbio.com, santi@loopbio.com', 'antonio.ortega@kuleuven.be'
+    author_email='john@loopbio.com, santi@loopbio.com, antonio.ortega@kuleuven.be',
     packages=find_packages(),
     classifiers=[
         'Intended Audience :: Science/Research',
