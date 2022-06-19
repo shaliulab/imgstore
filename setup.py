@@ -57,6 +57,7 @@ setup(
         'gitpython',
         'shapely>=1.7.1',
         'descartes',
+        'tqdm',
     ],
     tests_require=[
         'pytest',
