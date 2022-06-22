@@ -43,7 +43,6 @@ setup(
         'pytz',
         'tzlocal',
         'python-dateutil',
-        'cv2cuda>=1.0.4'
     ],
     tests_require=[
         'pytest',
@@ -51,7 +50,8 @@ setup(
         'pytest-pep8'
     ],
     extras_require={
-        'bloscpack': ['bloscpack']
+        'bloscpack': ['bloscpack'],
+        'cv2cuda': ['cv2cuda>=1.0.4']
     },
     entry_points={
         'console_scripts': [
