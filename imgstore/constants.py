@@ -22,3 +22,4 @@ FRAME_MD = ('frame_number', 'frame_time')
 VERBOSE_DEBUG_CHUNKS=False
 CONFIG_FILE=os.path.join(os.environ["HOME"], ".config", "imgstore", "imgstore.yml")
 SQLITE3_INDEX_FILE="index.db"
+FRAME_NUMBER_RESET=True

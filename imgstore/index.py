@@ -8,7 +8,7 @@ import warnings
 import yaml
 import numpy as np
 
-from .constants import FRAME_MD, SQLITE3_INDEX_FILE
+from .constants import FRAME_MD, SQLITE3_INDEX_FILE, FRAME_NUMBER_RESET
 
 
 def _load_index(path_without_extension):
@@ -90,6 +90,9 @@ class ImgStoreIndex(object):
             for chunk_n, chunk_path in sorted(chunk_n_and_chunk_paths, key=operator.itemgetter(0)):
                 try:
                     idx = _load_index(chunk_path)
+                    if FRAME_NUMBER_RESET:
+                        idx["frame_number"] = np.arange(frame_count, frame_count+len(idx["frame_number"]))
+
                 except IOError:
                     cls.log.warn('missing index for chunk %s' % chunk_n)
                     continue
