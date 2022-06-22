@@ -10,3 +10,8 @@
 ==========================
 
 * Implement future and past in get_nearest_image
+
+0.4.2
+=========================
+
+* Implement FRAME_NUMBER_RESET so the user can decide to reset or "remake" the frame_number and replace what is stored in the index
