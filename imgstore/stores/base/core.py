@@ -214,6 +214,9 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
             self.frame_number = np.nan  # we haven't read any frames yet
 
     def get_chunk(self, chunk):
+        """
+        Place the store so the next frame is the first frame of the chunk
+        """
         first_fn=self._index.get_chunk_metadata(chunk)["frame_number"][0]
         img, (frame_number, frame_time) = self.get_image(max(0, first_fn))
         return img, (frame_number, frame_time)
