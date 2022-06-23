@@ -16,7 +16,7 @@ class WritingStore(abc.ABC):
     def add_image(self, img, frame_number, frame_time):
 
         if img.shape != self._write_imgshape:
-            img = img[:self._write_imgshape[0], :self._write_imgshape[1]]
+            img = img[:self._write_imgshape[0], :self._write_imgshape[1]].copy(order="C")
         self._save_image(self._encode_image(img), frame_number, frame_time)
 
         self.frame_max = np.nanmax((frame_number, self.frame_max))
@@ -48,12 +48,13 @@ class WritingStore(abc.ABC):
         self._codec_proc.set_default_code(write_encode_encoding)
         self._encode_image = self._codec_proc.autoconvert
 
-        write_imgshape = self._calculate_image_shape(imgshape, fmt)
-        self._write_imgshape=write_imgshape
+        self._write_imgshape = self._calculate_image_shape(imgshape, fmt)
+        # self._write_imgshape=imgshape
+
 
         if write_encode_encoding:
             # as we always encode to color
-            write_imgshape = [write_imgshape[0], write_imgshape[1], 3]
+            self._write_imgshape = [self._write_imgshape[0], self._write_imgshape[1], 3]
 
         if not os.path.exists(self._basedir):
             os.makedirs(self._basedir)
@@ -68,7 +69,7 @@ class WritingStore(abc.ABC):
         self._created_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
         self._timezone_local = tzlocal.get_localzone()
 
-        store_md = {'imgshape': write_imgshape,
+        store_md = {'imgshape': self._write_imgshape,
                     'imgdtype': self._imgdtype,
                     'chunksize': chunksize,
                     'format': fmt,

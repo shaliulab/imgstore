@@ -97,6 +97,7 @@ class VideoImgStore(_ImgStore):
                 self._log.warn('previous store had incorrect image_shape: corrected %r -> %r' % (
                     self._imgshape, check_imgshape))
                 self._imgshape = check_imgshape
+            self._write_imgshape = check_imgshape
             self._color = (self._imgshape[-1] == 3) & (len(self._imgshape) == 3)
 
         self._log.info("store is native color: %s (or grayscale with encoding: '%s')" % (self._color, self._encoding))
