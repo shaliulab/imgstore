@@ -61,6 +61,7 @@ setup(
             'imgstore-save = imgstore.apps:main_saver',
             'imgstore-test = imgstore.apps:main_test',
             'imgstore-codecs = imgstore.apps:list_codecs',
+            'imgstore-muxer = imgstore.apps:main_muxer',
         ]
     },
 )

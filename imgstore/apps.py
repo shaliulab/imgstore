@@ -143,3 +143,64 @@ def main_generate_timecodes():
     store = new_for_filename(args.path[0])
 
     generate_timecodes(store, sys.stdout)
+
+
+def main_muxer():
+
+    import argparse
+    import os.path
+    import cv2
+    from imgstore.stores import new_for_format
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--video", type=str)
+    parser.add_argument("-s", type=str, default=None, help="""
+        XX:XX:XX position from which to start the video
+    """
+    )
+    parser.add_argument("-t", type=str, default=None, help="""
+        XX:XX:XX duration of video to be muxed
+    """
+    )
+
+    parser.add_argument("--output", type=str, help="""
+    Path to a metadata.yaml file in a folder
+    which will serve as the directory
+    where the imgstore will be created
+    """)
+
+    args = parser.parse_args()
+
+    assert os.path.exists(args.video)
+    assert not os.path.exists(args.output)
+    assert os.path.basename(args.output) == "metadata.yaml"
+
+    cap = cv2.VideoCapture(args.video)
+
+    store = new_for_format(
+        fmt="h264_nvenc/mp4", path=args.output,
+        chunksize=100, fps=25    
+    )
+
+    if args.s:
+        hour, minute, second = args.s.split(":")
+        msecs = hour*3600*1000 + minute*60*1000 + second*1000
+        cap.set(0, msecs)
+
+    if args.t:
+        hour, minute, second = args.t.split(":")
+        duration = hour*3600*1000 + minute*60*1000 + second*1000
+
+    ft0 = cap.get(0)
+    ft=ft0
+    fn = cap.get(1)
+
+    ret, img = cap.read()
+    while ret and (cap.get(0) - ft0) < duration:
+        store.add_image(img, frame_number=fn, frame_time=ft)
+        ft = cap.get(0)
+        fn = cap.get(1)
+        ret, img = cap.read()
+
+    cap.release()
+    store.release()
