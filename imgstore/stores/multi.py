@@ -1,12 +1,15 @@
 import warnings
 import os.path
+import traceback
 import logging
 import numpy as np
 import cv2
 
 from imgstore.stores.utils.mixins.extract import _extract_store_metadata
 from imgstore.stores.core import new_for_filename as new_for_filename_single
-from imgstore.stores.utils.mixins.cm import ContextManagerMixin
+from imgstore.stores.utils.mixins import ContextManagerMixin
+
+
 logger = logging.getLogger(__name__)
 _VERBOSE_DEBUG_GETS = False
 
@@ -58,8 +61,12 @@ class VideoImgStore(ContextManagerMixin):
             reshaped_imgs.append(
                 cv2.resize(img, shape[:2][::-1], cv2.INTER_NEAREST)
             )
-        
-        img=np.stack(reshaped_imgs, axis=1)
+       
+        img=np.concatenate(reshaped_imgs, axis=1)
+        # if imgs[0].shape[0] != img.shape[0]:
+        #     warnings.warn(f"Image has been deformed to shape {img.shape} instead of {imgs[0].shape[0]}")
+        #     img=img[:imgs[0].shape[0], :]
+
         return img
 
     
@@ -93,6 +100,19 @@ class VideoImgStore(ContextManagerMixin):
        
         img = self._apply_layout(imgs)
         return img, meta
+
+    
+    def read(self):
+
+        img, _ = self.get_next_image()
+
+        if type(img) is np.ndarray:
+            ret = True
+        else:
+            img = None
+            ret = False
+        
+        return ret, img
 
 
     def get_next_framenumber(self):
@@ -148,6 +168,10 @@ class VideoImgStore(ContextManagerMixin):
     def new_for_filename(cls, *args, **kwargs):
         return new_for_filename(*args, **kwargs)
 
+    def __getattr__(self, __name: str):
+        return getattr(self._selected, __name)
+
+
 def load_extra_cameras(path, **kwargs):
     """
     Load the stores listed in metadata.yaml (available in path) under key extra_cameras,
@@ -167,20 +191,23 @@ def load_extra_cameras(path, **kwargs):
     for camera in metadata.get(METADATA_KEY, []):
         try:
             stores[camera] = new_for_filename_single(camera, **kwargs)
+            print(f"Loaded {camera} imgstore")
+
         except FileNotFoundError:
             if os.path.isfile(path):
                 master_path = os.path.dirname(path)
             else:
                 master_path = path
 
-            camera = os.path.join(master_path, camera)
-            assert os.path.exists(camera), f"{master_path} does not exist"
-            stores[camera] = new_for_filename_single(camera, **kwargs)
+            find_path_to_camera = os.path.join(master_path, camera)
+            assert os.path.exists(find_path_to_camera), f"{find_path_to_camera} does not exist"
+            stores[camera] = new_for_filename_single(find_path_to_camera, **kwargs)
 
     return stores
 
 def new_for_filename(path, **kwargs):
     stores = {"master": new_for_filename_single(path, **kwargs)}
+    print("Loaded master imgstore")
     stores.update(load_extra_cameras(path, **kwargs))
     multistore = VideoImgStore(**stores)
     return multistore

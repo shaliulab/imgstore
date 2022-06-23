@@ -1,10 +1,11 @@
 import logging
 import traceback
-
+import cv2
 import numpy as np
-
+from confapp import conf, load_config
 logger = logging.getLogger(__name__)
 
+config = load_config()
 
 class CV2Mixin:
     """
@@ -20,8 +21,13 @@ class CV2Mixin:
 
         try:
             img, (_, _) = self.get_next_image()
+
             if isinstance(img, np.ndarray):
                 ret = True
+                if config.COLOR and len(img.shape) == 2:
+                    logger.debug(f"Converting grayscale image of shape {img.shape} to BGR")
+                    img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
             else:
                 ret = False
 
@@ -36,7 +42,7 @@ class CV2Mixin:
     def release(self):
         self.close()
 
-    def _set_posmsec(self, new_timestamp, absolute=False, **kwargs):
+    def _set_posmsec(self, new_timestamp, absolute=True, **kwargs):
 
         if not absolute:
             timestamp_0 = self._index.get_chunk_metadata(self._chunk_n)[
@@ -44,50 +50,43 @@ class CV2Mixin:
             ][0]
             new_timestamp += timestamp_0
 
-        img, (frame_number, timestamp) = self._get_image_by_time(
-            new_timestamp, **kwargs
+        img, (frame_number, timestamp) = self.get_nearest_image(
+            new_timestamp-1, future=False, **kwargs
         )
-        self.get_image(max(self.first_frame_number, frame_number - 1))
 
-    def _get_posmsec(self, absolute=False):
-        _, (frame_number, timestamp) = self.get_next_image()
-        _ = self.get_image(max(self.first_frame_number, frame_number - 1))
+    def _get_posmsec(self, absolute=True):
 
         if absolute:
-            posmsec = timestamp
+            return self._index.find_all(what="frame_number", value=self.frame_number+1)[3]
+
         else:
             timestamp_0 = self._index.get_chunk_metadata(self._chunk_n)[
                 "frame_time"
             ][0]
-            posmsec = timestamp - timestamp_0
+            posmsec = self.frame_time - timestamp_0
 
         return posmsec
 
     def _set_posframes(self, posframes):
 
-        frame_number_0 = self._index.get_chunk_metadata(self._chunk_n)[
-            "frame_number"
-        ][0]
-        posframes += frame_number_0
+        # frame_number_0 = self._get_chunk_metadata(self._chunk_n)[
+        #     "frame_number"
+        # ][0]
+        # posframes += frame_number_0
 
-        img, (frame_number, timestamp) = self.get_image(posframes)
-        self.get_image(max(self.first_frame_number, frame_number - 1))
+        img, (frame_number, timestamp) = self.get_image(posframes-1)
 
-    def _get_posframes(self, absolute=False):
-        _, (frame_number, _) = self.get_next_image()
-        _ = self.get_image(max(self.first_frame_number, frame_number - 1))
+    def _get_posframes(self, absolute=True):
 
         if absolute:
-            posframes = frame_number
+            return self.frame_number+1
         else:
-            frame_number_0 = self._index.get_chunk_metadata(self._chunk_n)[
-                "frame_number"
-            ][0]
-            posframes = frame_number - frame_number_0
+            frame_number_0 = self._get_chunk_metadata(self._chunk_n)["frame_number"][0]
+            posframes = self.frame_number - frame_number_0+1
 
         return posframes
 
-    def _set_posrel(self, posrel, absolute=False):
+    def _set_posrel(self, posrel, absolute=True):
 
         chunk_t0 = self._index.get_chunk_metadata(self._chunk_n)["frame_time"][
             0
@@ -97,7 +96,7 @@ class CV2Mixin:
         ]
         duration = chunk_tn - chunk_t0
         timestamp = chunk_t0 * posrel * duration
-        self._set_posmsec(timestamp, absolute=False)
+        self._set_posmsec(timestamp, absolute=True)
 
     def _get_posrel(self):
         posframes = self._get_posframes()
