@@ -91,7 +91,7 @@ class ImgStoreIndex(object):
                 try:
                     idx = _load_index(chunk_path)
                     if FRAME_NUMBER_RESET:
-                        idx["frame_number"] = np.arange(frame_count, frame_count+len(idx["frame_number"]))
+                        idx["frame_number"] = list(range(frame_count, frame_count+len(idx["frame_number"])))
 
                 except IOError:
                     cls.log.warn('missing index for chunk %s' % chunk_n)
