@@ -14,6 +14,9 @@ class WritingStore(abc.ABC):
 
 
     def add_image(self, img, frame_number, frame_time):
+
+        if img.shape != self._write_imgshape:
+            img = img[:self._write_imgshape[0], :self._write_imgshape[1]]
         self._save_image(self._encode_image(img), frame_number, frame_time)
 
         self.frame_max = np.nanmax((frame_number, self.frame_max))
@@ -45,7 +48,8 @@ class WritingStore(abc.ABC):
         self._codec_proc.set_default_code(write_encode_encoding)
         self._encode_image = self._codec_proc.autoconvert
 
-        write_imgshape = self._calculate_written_image_shape(imgshape, fmt)
+        write_imgshape = self._calculate_image_shape(imgshape, fmt)
+        self._write_imgshape=write_imgshape
 
         if write_encode_encoding:
             # as we always encode to color

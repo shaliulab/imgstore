@@ -146,6 +146,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         self._metadata = {}
         self._user_metadata = {}
         self._frame_metadata = {}
+        self._write_imgshape = ()
 
         self._tN = self._t0 = time.time()
 
@@ -213,6 +214,14 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
             assert self._chunk_n == 0
             self.frame_number = np.nan  # we haven't read any frames yet
 
+
+    def _calculate_image_shape(self, imgshape, fmt):
+        _imgshape = list(imgshape)
+        # bitwise and with -2 truncates downwards to even
+        _imgshape[0] = int(_imgshape[0]) & -2
+        _imgshape[1] = int(_imgshape[1]) & -2
+        return tuple(_imgshape)
+
     def get_chunk(self, chunk):
         """
         Place the store so the next frame is the first frame of the chunk
@@ -229,12 +238,6 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
     @property
     def index_db_exists(self):
         return os.path.exists(self.index_db_path)
-
-
-    # noinspection PyShadowingBuiltins,PyMethodMayBeStatic
-    def _calculate_written_image_shape(self, imgshape, fmt):
-        # TODO: This can surely be removed?
-        return imgshape
 
     def frame_number2frame_index(self, frame_number, chunk=None):
         if chunk:

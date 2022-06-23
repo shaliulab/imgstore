@@ -87,7 +87,9 @@ class VideoImgStore(_ImgStore):
             if self.supports_format(self._format) or \
                     ((self._metadata.get('class') == 'VideoImgStoreFFMPEG') and
                      (('264' in self._format) or ('nvenc-' in self._format))):
-                check_imgshape = self._calculate_written_image_shape(self._imgshape, '')
+                check_imgshape = tuple(self._imgshape)
+                #check_imgshape = self._calculate_image_shape(self._imgshape, '')
+
             else:
                 check_imgshape = tuple(self._imgshape)
 
@@ -107,13 +109,6 @@ class VideoImgStore(_ImgStore):
         if smd_version != self._version:
             raise ValueError('incompatible store version')
         return True
-
-    def _calculate_written_image_shape(self, imgshape, fmt):
-        _imgshape = list(imgshape)
-        # bitwise and with -2 truncates downwards to even
-        _imgshape[0] = int(_imgshape[0]) & -2
-        _imgshape[1] = int(_imgshape[1]) & -2
-        return tuple(_imgshape)
 
     @staticmethod
     def _get_chunk_extension(metadata):
