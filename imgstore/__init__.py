@@ -4,5 +4,8 @@ from .apps import main_test
 from .util import ensure_color, ensure_grayscale
 
 test = main_test
+from confapp import conf
+
+conf += "imgstore.constants"
 
 __version__ = '0.3.0'
