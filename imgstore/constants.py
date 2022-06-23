@@ -23,3 +23,6 @@ VERBOSE_DEBUG_CHUNKS=False
 CONFIG_FILE=os.path.join(os.environ["HOME"], ".config", "imgstore", "imgstore.yml")
 SQLITE3_INDEX_FILE="index.db"
 FRAME_NUMBER_RESET=True
+MULTI_STORE_ENABLED=False
+COLOR=True
+SELECTED_STORE="lowres/metadata.yaml"
