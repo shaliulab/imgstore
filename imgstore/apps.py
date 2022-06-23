@@ -178,7 +178,8 @@ def main_muxer():
     args = parser.parse_args()
 
     assert os.path.exists(args.video)
-    assert not os.path.exists(args.output)
+    if os.path.exists(args.output):
+        print(f"{args.output} exists. Overwriting")
     assert os.path.basename(args.output) == "metadata.yaml"
 
     cap = cv2.VideoCapture(args.video)
@@ -197,12 +198,15 @@ def main_muxer():
     fn = cap.get(1)
     ft0 = get_pos_msec(cap)
     ft=ft0
+    fps=cap.get(5)
 
     ret, img = cap.read()
 
     store = new_for_format(
         fmt="h264_nvenc/mp4", path=args.output,
-        chunksize=100, fps=cap.get(5), imgshape=img.shape[:2]
+        chunksize=100, imgshape=img.shape[:2],
+        # fps of recording
+        fps=fps,
     )
 
     nframes = int((duration / 1000) / cap.get(5))
