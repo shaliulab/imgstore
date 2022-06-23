@@ -143,7 +143,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         self._encode_image = None
         self._uuid = None
 
-        self._metadata = {}
+        self._metadata = {"framerate": fps}
         self._user_metadata = {}
         self._frame_metadata = {}
         self._write_imgshape = ()

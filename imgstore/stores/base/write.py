@@ -78,7 +78,9 @@ class WritingStore(abc.ABC):
                     # actually write the string as naieve because we have guarenteed it is UTC
                     'created_utc': self._created_utc.replace(tzinfo=None).isoformat(),
                     'timezone_local': str(self._timezone_local),
-                    'uuid': self._uuid}
+                    'uuid': self._uuid,
+                    **self._metadata
+                    }
 
         if metadata is None:
             metadata = {STORE_MD_KEY: store_md}

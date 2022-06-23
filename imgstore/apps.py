@@ -1,7 +1,9 @@
 from __future__ import print_function, absolute_import
 import logging
 
+import math
 import cv2
+import tqdm
 import numpy as np
 
 from .stores import new_for_filename, get_supported_formats, new_for_format
@@ -145,6 +147,10 @@ def main_generate_timecodes():
     generate_timecodes(store, sys.stdout)
 
 
+
+def get_pos_msec(cap):
+    return 1000*(cap.get(1) / cap.get(5))
+
 def main_muxer():
 
     import argparse
@@ -153,7 +159,7 @@ def main_muxer():
     from imgstore.stores import new_for_format
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--video", type=str)
+    parser.add_argument("--video", type=str, required=True)
     parser.add_argument("-s", type=str, default=None, help="""
         XX:XX:XX position from which to start the video
     """
@@ -163,7 +169,7 @@ def main_muxer():
     """
     )
 
-    parser.add_argument("--output", type=str, help="""
+    parser.add_argument("--output", type=str, required=True, help="""
     Path to a metadata.yaml file in a folder
     which will serve as the directory
     where the imgstore will be created
@@ -172,32 +178,47 @@ def main_muxer():
     args = parser.parse_args()
 
     assert os.path.exists(args.video)
-    assert not os.path.exists(args.output)
+    if os.path.exists(args.output):
+        print(f"{args.output} exists. Overwriting")
     assert os.path.basename(args.output) == "metadata.yaml"
 
     cap = cv2.VideoCapture(args.video)
 
-    store = new_for_format(
-        fmt="h264_nvenc/mp4", path=args.output,
-        chunksize=100, fps=25    
-    )
-
     if args.s:
-        hour, minute, second = args.s.split(":")
+        hour, minute, second = [int(e) for e in args.s.split(":")]
         msecs = hour*3600*1000 + minute*60*1000 + second*1000
         cap.set(0, msecs)
 
     if args.t:
-        hour, minute, second = args.t.split(":")
+        hour, minute, second = [int(e) for e in args.t.split(":")]
         duration = hour*3600*1000 + minute*60*1000 + second*1000
+    else:
+        duration = math.inf
 
-    ft0 = cap.get(0)
-    ft=ft0
     fn = cap.get(1)
+    ft0 = get_pos_msec(cap)
+    ft=ft0
+    fps=cap.get(5)
 
     ret, img = cap.read()
-    while ret and (cap.get(0) - ft0) < duration:
+
+    store = new_for_format(
+        fmt="h264_nvenc/mp4", path=args.output,
+        chunksize=100, imgshape=img.shape[:2],
+        # fps of recording
+        fps=fps,
+    )
+
+    nframes = int((duration / 1000) / cap.get(5))
+
+    pb=tqdm.tqdm(total=nframes, desc="Muxing ")
+
+    while ret and (get_pos_msec(cap) - ft0) < duration:
+        if len(img.shape) == 3:
+            img = img[:,:,0]
+        img=img.copy(order='C')
         store.add_image(img, frame_number=fn, frame_time=ft)
+        pb.update(1)
         ft = cap.get(0)
         fn = cap.get(1)
         ret, img = cap.read()
