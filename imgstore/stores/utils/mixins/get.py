@@ -71,6 +71,7 @@ class GetMixin:
         img = self._decode_image(_img)
         self._chunk_current_frame_idx = frame_idx
         self.frame_number = _frame_number
+        self.frame_time = _frame_timestamp
 
         return img, (_frame_number, _frame_timestamp)
 
