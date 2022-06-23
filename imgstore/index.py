@@ -309,13 +309,30 @@ class ImgStoreIndex(object):
         chunk_n, frame_idx = cur.fetchone()
         return chunk_n, frame_idx
 
-    def find_all(self, what, value, exact_only=True):
+    def find_all(self, what, value, exact_only=True, past=True, future=True):
         assert what in ('frame_number', 'frame_time')
         cur = self._conn.cursor()
+        
         if exact_only:
-            cur.execute("SELECT * FROM frames WHERE {} = ?;".format(what), (value, ))
-        else:
-            cur.execute("SELECT * FROM frames ORDER BY ABS(? - {}) LIMIT 1;".format(what), (value, ))
+            filter= f"WHERE {what} = ?"
+            val_tuple = (value,)
+
+        elif past and future:
+            filter=f" ORDER BY ABS(? - {what}) LIMIT 1"
+            val_tuple = (value,)
+
+        elif not future:
+            filter=f"WHERE ({what} - ?) <= 0 ORDER BY ABS(? - {what}) LIMIT 1"
+            val_tuple = (value, value,)
+
+        elif not past:
+            filter=f"WHERE ({what} - ?) >= 0 ORDER BY ABS(? - {what}) LIMIT 1"
+            val_tuple = (value, value,)
+
+
+        cmd=f"SELECT * FROM frames {filter};"
+        cur.execute(cmd, val_tuple)
+
         data = cur.fetchone()
         if data is None:
 
