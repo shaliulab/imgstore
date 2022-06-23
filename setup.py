@@ -18,7 +18,7 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     include_package_data=True,
-    version='0.4.2',
+    version='0.4.3',
     url='https://github.com/shaliulab/imgstore',
     author='John Stowers, Santi Villalba, Antonio Ortega',
     author_email='john@loopbio.com, santi@loopbio.com, antonio.ortega@kuleuven.be',
@@ -43,6 +43,8 @@ setup(
         'pytz',
         'tzlocal',
         'python-dateutil',
+        'confapp-shaliulab==1.1.12',
+        'codetiming',
     ],
     tests_require=[
         'pytest',
