@@ -21,6 +21,14 @@ except Exception:
 
 isColor=False
 
+
+def find_chunks_video(basedir, ext, chunk_numbers=None):
+    if chunk_numbers is None:
+        avis = map(os.path.basename, glob.glob(os.path.join(basedir, '*%s' % ext)))
+        chunk_numbers = list(map(int, map(operator.itemgetter(0), map(os.path.splitext, avis))))
+    data = list(zip(chunk_numbers, tuple(os.path.join(basedir, '%06d' % n) for n in chunk_numbers)))
+    return data
+
 class VideoImgStore(_ImgStore):
     _supported_modes = 'wr'
     _cv2_fmts = get_formats(cache=True, video=True)
@@ -129,10 +137,7 @@ class VideoImgStore(_ImgStore):
         return ['%s%s' % (p[1], ext) for p in self._chunk_n_and_chunk_paths]
 
     def _find_chunks(self, chunk_numbers):
-        if chunk_numbers is None:
-            avis = map(os.path.basename, glob.glob(os.path.join(self._basedir, '*%s' % self._ext)))
-            chunk_numbers = list(map(int, map(operator.itemgetter(0), map(os.path.splitext, avis))))
-        return list(zip(chunk_numbers, tuple(os.path.join(self._basedir, '%06d' % n) for n in chunk_numbers)))
+        return find_chunks_video(self._basedir, self._ext, chunk_numbers)
 
     def _save_image(self, img, frame_number, frame_time):
         # we always write color because its more supported
