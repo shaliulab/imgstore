@@ -15,3 +15,10 @@
 =========================
 
 * Implement FRAME_NUMBER_RESET so the user can decide to reset or "remake" the frame_number and replace what is stored in the index
+
+
+0.4.6
+============================
+
+
+* Add main_muxer
