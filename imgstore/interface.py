@@ -2,13 +2,14 @@ import traceback
 import warnings
 
 from idtrackerai.constants import EXTENSIONS
+import imgstore.constants
 from confapp import conf, load_config
 import cv2
 
 
-config = load_config()
+config = load_config(imgstore.constants)
 
-if config.MULTI_STORE_ENABLED:
+if getattr(config, "MULTI_STORE_ENABLED", False):
     import imgstore.stores.multi as imgstore
 else:
     import imgstore.stores as imgstore
@@ -28,7 +29,7 @@ class VideoCapture():
         elif any(path.endswith(ext) for ext in EXTENSIONS["imgstore"]):
             cap = imgstore.new_for_filename(path)
             cap.get_chunk(config.CHUNK)
-            if config.MULTI_STORE_ENABLED:
+            if getattr(config, "MULTI_STORE_ENABLED", False):
                 if config.SELECTED_STORE:
                     if config.SELECTED_STORE in cap._stores:
                         cap.select_store(config.SELECTED_STORE)
@@ -60,7 +61,7 @@ class VideoCapture():
             if self._type == "imgstore":
                 return self._get("ENDING_FRAME_OF_CHUNK")+1
             elif self._type == "opencv":
-                return self._get(7)
+                return self.get(7)
 
 
         elif property == "STARTING_FRAME_OF_CHUNK":
