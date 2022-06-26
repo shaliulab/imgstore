@@ -74,7 +74,14 @@ class CV2Mixin:
         # ][0]
         # posframes += frame_number_0
 
-        img, (frame_number, timestamp) = self.get_image(posframes-1)
+        if posframes - 1 < 0:
+            posframes_f = 0
+        else:
+            posframes_f = posframes - 1
+
+        img, (frame_number, timestamp) = self.get_image(posframes_f)
+        if posframes_f == 0:
+            self._cap.set(getattr(cv2, "CAP_PROP_POS_FRAMES", 1), 0)
 
     def _get_posframes(self, absolute=True):
 
