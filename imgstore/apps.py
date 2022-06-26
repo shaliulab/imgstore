@@ -7,6 +7,7 @@ import tqdm
 import numpy as np
 
 from .stores import new_for_filename, get_supported_formats, new_for_format
+from .stores import multi
 from .ui import new_window
 from .util import motif_get_parse_true_fps
 
@@ -152,6 +153,9 @@ def get_pos_msec(cap):
     return 1000*(cap.get(1) / cap.get(5))
 
 def main_muxer():
+    """
+    Mux a single video file into an imgstore
+    """
 
     import argparse
     import os.path
@@ -199,12 +203,20 @@ def main_muxer():
     ft0 = get_pos_msec(cap)
     ft=ft0
     fps=cap.get(5)
+    chunksize=int(fps*20)
 
     ret, img = cap.read()
+    h, w = img.shape[:2]
+    if h % 2 != 0:
+        h -= 1
+    if w % 2 != 0:
+        w -= 1
+    img = img[:h, :w]
+
 
     store = new_for_format(
         fmt="h264_nvenc/mp4", path=args.output,
-        chunksize=100, imgshape=img.shape[:2],
+        chunksize=chunksize, imgshape=img.shape[:2],
         # fps of recording
         fps=fps,
     )
@@ -225,3 +237,111 @@ def main_muxer():
 
     cap.release()
     store.release()
+
+def imgstore_muxer():
+    """
+    Mux an imgstore into another imgstore
+    """
+
+    import argparse
+    import os.path
+    import cv2
+    from imgstore.stores import new_for_format
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--video", type=str, required=True)
+    parser.add_argument("-s", type=str, default=None, help="""
+        XX:XX:XX position from which to start the video
+    """
+    )
+    parser.add_argument("-t", type=str, default=None, help="""
+        XX:XX:XX duration of video to be muxed
+    """
+    )
+
+    parser.add_argument("--output", type=str, required=True, help="""
+    Path to a metadata.yaml file in a folder
+    which will serve as the directory
+    where the imgstore will be created
+    """)
+
+    args = parser.parse_args()
+
+    assert os.path.exists(args.video)
+    if os.path.exists(args.output):
+        print(f"{args.output} exists. Overwriting")
+    assert os.path.basename(args.output) == "metadata.yaml"
+
+    multi_store = multi.new_for_filename(args.video)
+    fpss = {cap: multi_store._stores[cap].get(5) for cap in multi_store._stores}
+
+    if args.s:
+        hour, minute, second = [int(e) for e in args.s.split(":")]
+        msecs = hour*3600*1000 + minute*60*1000 + second*1000
+        multi_store.set(0, msecs)
+
+    if args.t:
+        hour, minute, second = [int(e) for e in args.t.split(":")]
+        duration = hour*3600*1000 + minute*60*1000 + second*1000
+    else:
+        duration = math.inf
+
+    _, (fn, ft) = multi_store.get_next_image()
+    multi_store.get_image(fn-1)
+    fns = {cap: multi_store._stores[cap].frame_number for cap in multi_store._stores}
+    fts = {cap: multi_store._stores[cap].frame_time for cap in multi_store._stores}
+    ft0=fts["master"]
+    chunksizes={cap: int(fpss[cap]*20) for cap in fpss}
+
+    imgs={}
+    ret = True
+    for cap in multi_store._stores:
+        ret_, img = multi_store._stores[cap].read()
+        ret = ret and ret_
+        imgs[cap]=img
+
+
+    stores = {}
+    for cap in multi_store._stores:
+        if cap != "master":
+            path = os.path.join(os.path.dirname(args.output), cap)
+        else:
+            path = os.path.dirname(args.output)
+
+        imgshape = list(imgs[cap].shape[:2])
+        for i, v in enumerate(imgshape):
+            if imgshape[i] % 2 != 0:
+                imgshape[i] -= 1
+
+        imgshape=tuple(imgshape)
+        stores[cap]=new_for_format(
+                fmt="h264_nvenc/mp4", path=path,
+                chunksize=chunksizes[cap], imgshape=imgshape,
+                fps=fpss[cap]
+        )
+ 
+    nframes = {cap: int((duration / 1000) / fpss[cap]) for cap in fpss}
+    pb=tqdm.tqdm(total=nframes["master"], desc="Muxing ")
+
+    while ret and (fts["master"] - ft0) < duration:
+
+        for cap_name, img in imgs.items():
+            cap = multi_store._stores[cap_name]
+            if cap_name == "master":
+                if cap.frame_time > multi_store._stores["lowres/metadata.yaml"].frame_time:
+                    continue
+            if len(imgs[cap_name].shape) > 2:
+                imgs[cap_name] = img[:, :, 0]#.copy(order='C')
+            # print(fts[cap_name])
+            stores[cap_name].add_image(imgs[cap_name], frame_number=fns[cap_name], frame_time=fts[cap_name])
+            if cap_name == "master":
+                pb.update(1)
+            fts[cap_name]= cap.frame_time
+            fns[cap_name] = cap.frame_number
+            ret, imgs[cap_name] = cap.read()
+
+    for cap in multi_store._stores:
+        multi_store._stores[cap].release()
+        stores[cap].release()
+
+
