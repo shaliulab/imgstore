@@ -18,7 +18,7 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     include_package_data=True,
-    version='0.4.5',
+    version='0.4.6',
     url='https://github.com/shaliulab/imgstore',
     author='John Stowers, Santi Villalba, Antonio Ortega',
     author_email='john@loopbio.com, santi@loopbio.com, antonio.ortega@kuleuven.be',
@@ -62,6 +62,7 @@ setup(
             'imgstore-test = imgstore.apps:main_test',
             'imgstore-codecs = imgstore.apps:list_codecs',
             'imgstore-muxer = imgstore.apps:main_muxer',
+            'imgstore2imgstore-muxer = imgstore.apps:imgstore_muxer',
         ]
     },
 )
