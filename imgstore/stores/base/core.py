@@ -167,6 +167,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         self._chunk_n = 0
         self._chunk_current_frame_idx = -1
         self._chunk_n_and_chunk_paths = None
+        self._last_img = None
 
         # file pointer and filename of a file which can be used to store additional data per frame
         # (this is only created if data is actually stored)

@@ -106,6 +106,7 @@ class DirectoryImgStore(_ImgStore):
     def _load_image(self, idx):
         path = os.path.join(self._chunk_cdir, '%06d.%s' % (idx, self._format))
         img = self._open_image(path, self._format, self._color)
+        self._last_img = img.copy()
         return img, (self._chunk_md['frame_number'][idx], self._chunk_md['frame_time'][idx])
 
     def _load_chunk(self, n):

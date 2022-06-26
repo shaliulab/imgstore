@@ -230,6 +230,7 @@ class VideoImgStore(_ImgStore):
             img = ensure_color(_img)
         else:
             img = ensure_grayscale(_img)
+        self._last_img = img.copy()
 
         return img, (self._chunk_md['frame_number'][idx], self._chunk_md['frame_time'][idx])
 
