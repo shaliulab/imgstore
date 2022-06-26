@@ -1,24 +1,30 @@
+"""
+Multistore module
+
+The master store frame always goes on the left
+The selected store is the one that sets the time series i.e. the frame times available
+"""
+
 import warnings
 import os.path
 import traceback
 import logging
 import numpy as np
 import cv2
-
+import codetiming
 from imgstore.stores.utils.mixins.extract import _extract_store_metadata
 from imgstore.stores.core import new_for_filename as new_for_filename_single
 from imgstore.stores.utils.mixins import ContextManagerMixin
-
+from imgstore.stores.utils.mixins.multi import MultiStoreCrossIndexMixIn
+from confapp import conf, load_config
+from imgstore import constants
+config = load_config(constants)
 
 logger = logging.getLogger(__name__)
 _VERBOSE_DEBUG_GETS = False
 
-### Multistore module
-#
-# The master store frame always goes on the left
-# The selected store is the one that sets the time series i.e. the frame times available
 
-class VideoImgStore(ContextManagerMixin):
+class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
 
     def __init__(self, **stores):
         self._stores = stores
@@ -26,6 +32,7 @@ class VideoImgStore(ContextManagerMixin):
         self._selected = stores.get("lowres/metadata.yaml", stores["master"])
         self._selected_name = "master"
         self._index = self._master._index
+        self._basedir = self._master._basedir
 
     def close(self):
         for store_name in self._stores:
@@ -63,9 +70,11 @@ class VideoImgStore(ContextManagerMixin):
             )
        
         img=np.concatenate(reshaped_imgs, axis=1)
-        # if imgs[0].shape[0] != img.shape[0]:
-        #     warnings.warn(f"Image has been deformed to shape {img.shape} instead of {imgs[0].shape[0]}")
-        #     img=img[:imgs[0].shape[0], :]
+
+        if config.COLOR and len(img.shape) == 2:
+            logger.debug(f"Converting grayscale image of shape {img.shape} to BGR")
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
 
         return img
 
@@ -78,27 +87,55 @@ class VideoImgStore(ContextManagerMixin):
             self._metadata = self._selected._metadata.copy()
             self._metadata["imgshape"] = (self._master._metadata["imgshape"][0], self._master._metadata["imgshape"][1]*len(self._stores))
             self._index = self._selected._index
+            self._make_crossindex()
         except KeyError:
             warnings.warn(f"{name} is not a store", stacklevel=2)
     
     def get_next_image(self):
 
-        _, meta = self._selected.get_next_image()
-        
+        img, meta = self._selected.get_next_image()
+        # master_fn = self.crossindex.loc[self._selected.frame_number, ("master", "frame_number")].item()
+        # import ipdb; ipdb.set_trace()
+        master_fn = self.crossindex.find_master_fn(self._selected.frame_number)
         frame_number, frame_time = meta
-        
-        master_img, _ = self._master.get_nearest_image(frame_time)
 
-        imgs = [master_img]
+        if conf.LOOKUP_NEAREST:
+            with codetiming.Timer(text="get nearest image on master took {:.8f} seconds to compute", logger=print):
+                master_img, _ = self._master.get_nearest_image(frame_time)
+        else:
+            if (self._master.frame_number + 1) == master_fn:
+                with codetiming.Timer(text="get next image on master took {:.8f} seconds to compute", logger=print):
+                    master_img, _ = self._master.get_next_image()
+            elif (self._master.frame_number) == master_fn:
+                with codetiming.Timer(text="_last_img.copy() on master took {:.8f} seconds to compute", logger=print):
+                    master_img = self._master._last_img.copy()
+            else:
+                with codetiming.Timer(text="get image on master took {:.8f} seconds to compute", logger=print):
+                    try:
+                        master_img, _ = self._master.get_image(master_fn)
+                    except Exception as error:
+                        raise error
+
+        print(f"Master is in frame number #{self._master.frame_number}")
+        print(f"Selected is  in frame number #{self._selected.frame_number}")
+
+
+
+        if self._selected_name == "master":
+            imgs = [master_img]
+        else:
+            imgs = [master_img, img]
 
         for store_name, store in self._stores.items():
-            if store_name == "master":
+            if store_name in ["master", self._selected_name]:
                 continue
             else:
-                img, _ = store.get_nearest_image(frame_time)
-                imgs.append(img)
-       
-        img = self._apply_layout(imgs)
+                with codetiming.Timer(text="get nearest image on {store_name} took {:.8f} seconds to compute", logger=print):
+                    img, _ = store.get_nearest_image(frame_time)
+                    imgs.append(img)
+
+        with codetiming.Timer(text="_apply_layout took {:.8f} seconds to compute", logger=print):
+            img = self._apply_layout(imgs)
         return img, meta
 
     
@@ -150,12 +187,24 @@ class VideoImgStore(ContextManagerMixin):
 
         if _VERBOSE_DEBUG_GETS:
             self._log.debug('get_image %s (exact: %s) frame_idx %s' % (frame_number, exact_only, frame_index))
+        
+        imgs=[None, None]
+        # master_fn = self.crossindex.loc[frame_number, ("master", "frame_number")]
+        master_fn = self.crossindex.find_master_fn(frame_number)
 
-        chunk, frame_idx, frame_number, frame_time = self._index.find_all("frame_number", frame_number, exact_only=exact_only)
-        return self.get_nearest_image(frame_time)
+        imgs[0], _ = self._master.get_image(master_fn)
+        imgs[1], selected_meta = self._selected.get_image(master_fn)
+
+        img = self._apply_layout(imgs)
+        return img, selected_meta
+
+        # chunk, frame_idx, frame_number, frame_time = self._index.find_all("frame_number", frame_number, exact_only=exact_only)
+        # return self.get_nearest_image(frame_time)
+
 
     def get_chunk(self, chunk):
         _, (fn, ft) = self._master.get_chunk(chunk)
+
         for store_name, store in self._stores.items():
             if store_name == "master":
                 continue

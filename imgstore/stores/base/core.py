@@ -230,6 +230,11 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         img, (frame_number, frame_time) = self.get_image(max(0, first_fn))
         return img, (frame_number, frame_time)
     
+    @property
+    def frame_metadata(self):
+        if len(self._frame_metadata) == 0:
+            self._frame_metadata=self._index.get_all_metadata()
+        return self._frame_metadata
 
     @property
     def index_db_path(self):

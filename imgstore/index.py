@@ -343,5 +343,15 @@ class ImgStoreIndex(object):
             error_msg=f"Cannot find {what} set to {value}\n"
             for w in _what:
                 error_msg+=f"{w}={str(self._summary(w))} "
-            raise Exception(error_msg)
+            raise IndexError(error_msg)
         return data
+
+    
+    def get_start_of_chunks(self):
+        """
+        Return the chunk and starting frame number
+        where a new chunk is created as a list of tuples
+        """
+        cur = self._conn.cursor()
+        cur.execute("SELECT chunk, frame_number from frames where frame_idx == 0;")
+        return cur.fetchall()
