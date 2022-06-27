@@ -24,7 +24,7 @@ class CV2Mixin:
 
             if isinstance(img, np.ndarray):
                 ret = True
-                if config.COLOR and len(img.shape) == 2:
+                if getattr(config, "COLOR", False) and len(img.shape) == 2:
                     logger.debug(f"Converting grayscale image of shape {img.shape} to BGR")
                     img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
