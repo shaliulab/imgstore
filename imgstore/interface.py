@@ -1,11 +1,13 @@
 import traceback
 import warnings
+import logging
 
 from idtrackerai.constants import EXTENSIONS
 import imgstore.constants
 from confapp import conf, load_config
 import cv2
 
+logger = logging.getLogger(__name__)
 
 config = load_config(imgstore.constants)
 
@@ -16,7 +18,9 @@ else:
 
 class VideoCapture():
 
-    def __init__(self, path):
+    def __init__(self, path, chunk=None):
+
+        self._chunk=chunk
 
         if type(path) is self.__class__:
             if type(path) is cv2.VideoCapture:
@@ -25,10 +29,14 @@ class VideoCapture():
             elif type(path) is imgstore.VideoImgStore:
                 cap = path
                 capture_type = "imgstore"
+                if self._chunk is None:
+                    logger.info("Selecting chunk {config.CHUNK}")
+                    self._chunk=config.CHUNK
+                  
         
         elif any(path.endswith(ext) for ext in EXTENSIONS["imgstore"]):
             cap = imgstore.new_for_filename(path)
-            cap.get_chunk(config.CHUNK)
+            cap.get_chunk(self._chunk)
             if getattr(config, "MULTI_STORE_ENABLED", False):
                 if config.SELECTED_STORE:
                     if config.SELECTED_STORE in cap._stores:

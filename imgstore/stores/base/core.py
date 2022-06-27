@@ -23,6 +23,8 @@ _VERBOSE_VERY = False  # overrides the other and prints all logs to stdout
 
 from imgstore.stores.utils.mixins import MIXINS
 
+logger = logging.getLogger(__name__)
+
 # note: frame_idx always refers to the frame_idx within the chunk
 # whereas frame_index refers to the global frame_index from (0, frame_count]
 
@@ -227,6 +229,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         """
         Place the store so the next frame is the first frame of the chunk
         """
+        self._log.debug(f"{self}.get_chunk({chunk})")
         first_fn=self._index.get_chunk_metadata(chunk)["frame_number"][0]
         img, (frame_number, frame_time) = self.get_image(max(0, first_fn))
         return img, (frame_number, frame_time)

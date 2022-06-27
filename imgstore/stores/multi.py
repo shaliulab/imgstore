@@ -94,8 +94,6 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
     def get_next_image(self):
 
         img, meta = self._selected.get_next_image()
-        # master_fn = self.crossindex.loc[self._selected.frame_number, ("master", "frame_number")].item()
-        # import ipdb; ipdb.set_trace()
         master_fn = self.crossindex.find_master_fn(self._selected.frame_number)
         frame_number, frame_time = meta
 
@@ -203,6 +201,7 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
 
 
     def get_chunk(self, chunk):
+        self._log.debug(f"{self}.get_chunk({chunk})")
         _, (fn, ft) = self._master.get_chunk(chunk)
 
         for store_name, store in self._stores.items():
