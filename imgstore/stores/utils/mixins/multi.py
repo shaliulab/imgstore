@@ -121,6 +121,16 @@ class MultiStoreCrossIndexMixIn:
         cur.execute(f"SELECT frame_number FROM master WHERE id = {selected_fn};")
         return cur.fetchone()[0]
 
+    def find_selected_fn(self, master_fn):
+        """
+        Given a frame number from the master (higher spatial resolution) store,
+        return the frame number that should be retrieved in the selected store
+        This is conveniently stored in the crossindex
+        """
+        cur=self._conn.cursor()
+        cur.execute(f"SELECT id FROM master WHERE frame_number = {master_fn};")
+        return cur.fetchone()[0]
+
 
     def get_all_master_fn(self):
         cur=self._conn.cursor()
