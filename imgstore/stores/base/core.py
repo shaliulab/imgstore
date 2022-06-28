@@ -230,6 +230,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         Place the store so the next frame is the first frame of the chunk
         """
         self._log.debug(f"{self}.get_chunk({chunk})")
+        assert chunk is not None
         first_fn=self._index.get_chunk_metadata(chunk)["frame_number"][0]
         img, (frame_number, frame_time) = self.get_image(max(0, first_fn))
         return img, (frame_number, frame_time)
