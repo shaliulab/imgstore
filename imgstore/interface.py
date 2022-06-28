@@ -34,7 +34,7 @@ class VideoCapture():
                     self._chunk=config.CHUNK
                   
         
-        elif any(path.endswith(ext) for ext in EXTENSIONS["imgstore"]):
+        elif any([path.endswith(ext) for ext in EXTENSIONS["imgstore"]]):
             cap = imgstore.new_for_filename(path)
             cap.get_chunk(self._chunk)
             if getattr(config, "MULTI_STORE_ENABLED", False):
@@ -50,6 +50,8 @@ class VideoCapture():
             cap = cv2.VideoCapture(path)
             capture_type = "opencv"
 
+        else:
+            raise Exception(f"Passed path {path} is not supported")
 
         self._cap = cap
         self._type = capture_type
