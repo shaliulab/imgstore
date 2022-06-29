@@ -36,3 +36,6 @@ nosetests.xml
 
 # Local conda installation
 miniconda
+
+# Notebooks
+*.ipynb
