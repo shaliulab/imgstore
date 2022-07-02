@@ -98,17 +98,17 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
         frame_number, frame_time = meta
 
         if conf.LOOKUP_NEAREST:
-            with codetiming.Timer(text="get nearest image on master took {:.8f} seconds to compute", logger=print):
+            with codetiming.Timer(text="get nearest image on master took {:.8f} seconds to compute", logger=logger.debug):
                 master_img, _ = self._master.get_nearest_image(frame_time)
         else:
             if (self._master.frame_number + 1) == master_fn:
-                with codetiming.Timer(text="get next image on master took {:.8f} seconds to compute", logger=print):
+                with codetiming.Timer(text="get next image on master took {:.8f} seconds to compute", logger=logger.debug):
                     master_img, _ = self._master.get_next_image()
             elif (self._master.frame_number) == master_fn:
-                with codetiming.Timer(text="_last_img.copy() on master took {:.8f} seconds to compute", logger=print):
+                with codetiming.Timer(text="_last_img.copy() on master took {:.8f} seconds to compute", logger=logger.debug):
                     master_img = self._master._last_img.copy()
             else:
-                with codetiming.Timer(text="get image on master took {:.8f} seconds to compute", logger=print):
+                with codetiming.Timer(text="get image on master took {:.8f} seconds to compute", logger=logger.debug):
                     try:
                         master_img, _ = self._master.get_image(master_fn)
                     except Exception as error:
@@ -116,8 +116,6 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
 
         print(f"Master is in frame number #{self._master.frame_number}")
         print(f"Selected is  in frame number #{self._selected.frame_number}")
-
-
 
         if self._selected_name == "master":
             imgs = [master_img]
@@ -128,11 +126,11 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
             if store_name in ["master", self._selected_name]:
                 continue
             else:
-                with codetiming.Timer(text="get nearest image on {store_name} took {:.8f} seconds to compute", logger=print):
+                with codetiming.Timer(text="get nearest image on {store_name} took {:.8f} seconds to compute", logger=logger.debug):
                     img, _ = store.get_nearest_image(frame_time)
                     imgs.append(img)
 
-        with codetiming.Timer(text="_apply_layout took {:.8f} seconds to compute", logger=print):
+        with codetiming.Timer(text="_apply_layout took {:.8f} seconds to compute", logger=logger.debug):
             img = self._apply_layout(imgs)
         return img, meta
 
@@ -188,10 +186,13 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
         
         imgs=[None, None]
         # master_fn = self.crossindex.loc[frame_number, ("master", "frame_number")]
-        master_fn = self.crossindex.find_master_fn(frame_number)
+        with codetiming.Timer(text="find_master_fn took {:.8f} seconds to compute", logger=logger.debug):
+            master_fn = self.crossindex.find_master_fn(frame_number)
 
-        imgs[0], _ = self._master.get_image(master_fn)
-        imgs[1], selected_meta = self._selected.get_image(master_fn)
+        with codetiming.Timer(text="get_image on master took {:.8f} seconds to compute", logger=logger.debug):
+            imgs[0], _ = self._master.get_image(master_fn)
+        with codetiming.Timer(text="get_image on selected took {:.8f} seconds to compute", logger=logger.debug):
+            imgs[1], selected_meta = self._selected.get_image(frame_number)
 
         img = self._apply_layout(imgs)
         return img, selected_meta

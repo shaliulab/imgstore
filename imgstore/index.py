@@ -1,8 +1,10 @@
-from importlib.resources import path
+import time
 import os.path
 import sqlite3
 import logging
 import operator
+import logging
+import codetiming
 import warnings
 
 import yaml
@@ -10,6 +12,7 @@ import numpy as np
 
 from .constants import FRAME_MD, SQLITE3_INDEX_FILE, FRAME_NUMBER_RESET
 
+logger = logging.getLogger(__name__)
 
 def _load_index(path_without_extension):
     for extension in ('.npz', '.yaml'):
@@ -273,15 +276,17 @@ class ImgStoreIndex(object):
         assert what in ('frame_number', 'frame_time', 'index')
         cur = self._conn.cursor()
 
-        if what == 'index':
-            cur.execute("SELECT chunk, frame_idx FROM frames ORDER BY rowid LIMIT 1 OFFSET {};".format(int(value)))
-        else:
-            cur.execute("SELECT chunk, frame_idx FROM frames WHERE {} = ?;".format(what), (value, ))
+        with codetiming.Timer(text="Find chunk took {:.8f} seconds to compute"):
 
-        try:
-            chunk_n, frame_idx = cur.fetchone()
-        except TypeError:  # no result
-            return -1, -1
+            if what == 'index':
+                cur.execute("SELECT chunk, frame_idx FROM frames ORDER BY rowid LIMIT 1 OFFSET {};".format(int(value)))
+            else:
+                cur.execute("SELECT chunk, frame_idx FROM frames WHERE {} = ?;".format(what), (value, ))
+
+            try:
+                chunk_n, frame_idx = cur.fetchone()
+            except TypeError:  # no result
+                chunk_n = frame_idx = -1
 
         return chunk_n, frame_idx
 
