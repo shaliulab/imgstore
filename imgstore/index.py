@@ -130,6 +130,9 @@ class ImgStoreIndex(object):
         cur = db.cursor()
 
         cur.executemany('INSERT INTO frames VALUES (?,?,?,?)', records)
+        
+        with codetiming.Timer(text="CREATE UNIQUE INDEX id ON FRAMES (frame_number) took {:.8f} seconds to run", logger=logger.info):
+            cur.execute("CREATE UNIQUE INDEX id ON frames (frame_number);")
 
         for i in range(len(chunks)):
             cur.execute('INSERT INTO chunks VALUES (?, ?)', chunks[i])
