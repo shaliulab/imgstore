@@ -248,7 +248,10 @@ def imgstore_muxer():
     import cv2
     from imgstore.stores import new_for_format
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="""
+        Take an existing imgstore and \"remux\" it,
+        so 
+    """)
     parser.add_argument("--video", type=str, required=True)
     parser.add_argument("-s", type=str, default=None, help="""
         XX:XX:XX position from which to start the video
@@ -258,7 +261,10 @@ def imgstore_muxer():
         XX:XX:XX duration of video to be muxed
     """
     )
-
+    parser.add_argument("--chunk_duration", type=int, help="""
+        Duration in seconds of the chunks in the new remuxed store
+    """
+    )
     parser.add_argument("--output", type=str, required=True, help="""
     Path to a metadata.yaml file in a folder
     which will serve as the directory
@@ -274,6 +280,17 @@ def imgstore_muxer():
 
     multi_store = multi.new_for_filename(args.video)
     fpss = {cap: multi_store._stores[cap].get(5) for cap in multi_store._stores}
+
+    if args.chunk_duration is None:
+        chunksize = multi_store._master._metadata["chunksize"]
+        chunk_duration = chunksize // fpss["master"]
+        _log.info(f"No chunk duration passed. New imgstore wil have chunk duration {chunk_duration}")
+
+
+    else:
+        chunk_duration = args.chunk_duration
+
+
 
     if args.s:
         hour, minute, second = [int(e) for e in args.s.split(":")]
@@ -291,7 +308,7 @@ def imgstore_muxer():
     fns = {cap: multi_store._stores[cap].frame_number for cap in multi_store._stores}
     fts = {cap: multi_store._stores[cap].frame_time for cap in multi_store._stores}
     ft0=fts["master"]
-    chunksizes={cap: int(fpss[cap]*20) for cap in fpss}
+    chunksizes={cap: int(fpss[cap]*chunk_duration) for cap in fpss}
 
     imgs={}
     ret = True
