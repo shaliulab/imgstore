@@ -51,7 +51,7 @@ class CV2Mixin:
             new_timestamp += timestamp_0
 
         img, (frame_number, timestamp) = self.get_nearest_image(
-            new_timestamp-1, future=False, **kwargs
+            max(0, new_timestamp-1), future=False, **kwargs
         )
 
     def _get_posmsec(self, absolute=True):

@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 
 config = load_config(imgstore.constants)
 
-if getattr(config, "MULTI_STORE_ENABLED", False):
+MULTI_STORE_ENABLED=getattr(config, "MULTI_STORE_ENABLED", False)
+if MULTI_STORE_ENABLED:
     import imgstore.stores.multi as imgstore
 else:
     import imgstore.stores as imgstore
@@ -57,6 +58,10 @@ class VideoCapture():
         self._type = capture_type
 
     def _get(self, property):
+        if MULTI_STORE_ENABLED and type(self._cap) is imgstore.VideoImgStore:
+            return self._cap.get(property)
+
+
         if property == "NUMBER_OF_FRAMES_IN_CHUNK":
             # this is the number of frames in the chunk
             if self._type == "imgstore":
@@ -93,7 +98,7 @@ class VideoCapture():
         elif property == "TOTAL_NUMBER_OF_FRAMES":
             # this is the frame number of the last frame in this store
             if self._type == "imgstore":
-                return self._cap._index._summary("frame_max")
+                return self._cap._index._summary("frame_max")  + 1 # frames are 0 indexed
 
             elif self._type == "opencv":
                 return self._cap.get(7)
