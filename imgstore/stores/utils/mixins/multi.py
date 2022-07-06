@@ -1,3 +1,15 @@
+"""
+Provide cross-indexing functionality in a set of synchronized multistores
+
+Problem: play back of a set of (2) multistores that are synchronized
+but have a different framerate is not trivial.
+This module provides the functionality to generate a cross-index,
+a table that shows for each frame on each store, which frame in the other stores
+should be mapped to
+The index is built in SQLite, and the frame number is indexed,
+which helps speeding up lookups several orders of magnitude
+"""
+
 import logging
 import warnings
 import os.path
@@ -5,8 +17,12 @@ import sqlite3
 import numpy as np
 import pandas as pd
 import tqdm
+import time
+import codetiming
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.addHandler(logging.StreamHandler())
 
 def last_value(column):
     """
@@ -16,7 +32,7 @@ def last_value(column):
 
     data = np.array([e for e in column])
     non_nan_index=np.where(~np.isnan(column))[0]
-    for i in tqdm.tqdm(range(len(non_nan_index))):
+    for i in tqdm.tqdm(range(len(non_nan_index)), desc="Propagating next non-nan value towards the past"):
         if (i+1) >= len(non_nan_index):
             last_pos = len(data)
         else:
@@ -31,6 +47,7 @@ def first_value(column):
     after the occurrence of each nan
     """
     data = np.array([e for e in column])
+    assert not np.isnan(data).all()
     nan_index=np.where(np.isnan(column))[0]
 
     if len(nan_index) == 0:
@@ -60,7 +77,7 @@ def first_value(column):
     # print(f"Last nan {last_nan}")
 
     if (len(last_nan) + 1) == len(first_nan):
-        last_nan.append(first_nan[-1])  
+        last_nan.append(first_nan[-1])
     for i in range(len(last_nan)):
         data[first_nan[i]:last_nan[i]+1]=column[last_nan[i]+1]
 
@@ -76,7 +93,8 @@ class MultiStoreCrossIndexMixIn:
             logger.info(f"Loading cached crossindex --> {CROSSINDEX_FILE}")
         else:
             logger.info("Generating crossindex. This may take a few seconds")
-            self._crossindex=self.build_crossindex()
+            with codetiming.Timer(text="Generated cross-index in {:.8f} seconds", logger=logger.info):
+                self._crossindex=self.build_crossindex()
             logger.info(f"Saving to sqlite file -> {CROSSINDEX_FILE}. This may take a few seconds")
             self._save_to_sqlite(CROSSINDEX_FILE)
 
@@ -86,6 +104,9 @@ class MultiStoreCrossIndexMixIn:
         with sqlite3.connect(CROSSINDEX_FILE) as conn:
             self._crossindex["master"].to_sql(name="master", con=conn, index_label="id")
             self._crossindex["selected"].to_sql(name="selected", con=conn, index_label="id")
+            cur=conn.cursor()
+            cur.execute("CREATE INDEX master_frame_number ON master (frame_number);")
+            cur.execute("CREATE INDEX selected_frame_number ON selected (frame_number);")
         
         return None
 
@@ -110,6 +131,20 @@ class MultiStoreCrossIndexMixIn:
         self.__conn = sqlite3.connect(CROSSINDEX_FILE)
         return self.__conn
 
+    def find_fn_given_id(self, store, id):
+        cur=self._conn.cursor()
+        cur.execute(f"SELECT frame_number FROM {store} WHERE id = {id};")
+        return cur.fetchone()[0]
+    
+    def find_id_given_fn(self, store, fn):
+        """
+        Takes as input a frame number and a store name
+        and returns the id on the crossindex tables master and selected
+        """
+
+        cur=self._conn.cursor()
+        cur.execute(f"SELECT id FROM {store} WHERE frame_number = {fn};")
+        return cur.fetchone()[0]
 
     def find_master_fn(self, selected_fn):
         """
@@ -117,9 +152,12 @@ class MultiStoreCrossIndexMixIn:
         return the frame number that should be retrieved in the master store
         This is conveniently stored in the crossindex
         """
+
+        id=self.find_id_given_fn("master", selected_fn)
         cur=self._conn.cursor()
-        cur.execute(f"SELECT frame_number FROM master WHERE id = {selected_fn};")
-        return cur.fetchone()[0]
+        cur.execute(f"SELECT frame_number FROM master WHERE id = {id};")
+        data=cur.fetchone()[0]
+        return data
 
     def find_selected_fn(self, master_fn):
         """
@@ -127,8 +165,10 @@ class MultiStoreCrossIndexMixIn:
         return the frame number that should be retrieved in the selected store
         This is conveniently stored in the crossindex
         """
+
+        id=self.find_id_given_fn("master", master_fn)
         cur=self._conn.cursor()
-        cur.execute(f"SELECT id FROM master WHERE frame_number = {master_fn};")
+        cur.execute(f"SELECT frame_number FROM selected WHERE id = {id};")
         return cur.fetchone()[0]
 
 
@@ -138,10 +178,31 @@ class MultiStoreCrossIndexMixIn:
         return cur.fetchall()
 
 
-    def get_number_of_frames(self, store_name):
+    def get_number_of_frames(self):
         cur=self._conn.cursor()
-        cur.execute(f"SELECT frame_number FROM {store_name} ORDER BY id DESC LIMIT 1;")
+        cur.execute(f"SELECT COUNT(*) FROM master;")
         return cur.fetchone()[0]
+
+    def get_number_of_frames_in_chunk(self, chunk):
+        cur=self._conn.cursor()
+        cur.execute(f"SELECT COUNT(*) FROM master WHERE chunk={chunk};")
+        return cur.fetchone()[0]
+
+    def get_starting_frame_of_chunk(self, chunk):
+        cur=self._conn.cursor()
+        cur.execute(f"SELECT id FROM master WHERE chunk={chunk} LIMIT 1;")
+        return cur.fetchone()[0]
+
+    def get_ending_frame_of_chunk(self, chunk):
+        cur=self._conn.cursor()
+        cur.execute(f"SELECT id FROM master WHERE chunk={chunk};")
+        return cur.fetchall()[-1][0]
+ 
+    def get_refresh_ids(self):
+        cur=self._conn.cursor()
+        cur.execute("SELECT id FROM master WHERE refresh=1;")
+        return cur.fetchall()
+        
 
     def annotate_chunk(self, store_name, crossindex):
         """
@@ -199,10 +260,12 @@ class MultiStoreCrossIndexMixIn:
         (in the same row) is played
         """
 
-
+        logger.info("Loading metadata from selected store")
         selected_metadata = pd.DataFrame.from_dict(
             self._selected.frame_metadata
         )
+
+        logger.info("Loading metadata from master store")
         master_metadata = pd.DataFrame.from_dict(
             self._master.frame_metadata
         )
@@ -214,6 +277,8 @@ class MultiStoreCrossIndexMixIn:
         master_metadata["dummy"]="X"
         selected_metadata["dummy"]="X"
 
+
+        logger.info("Performing first merge_asof")
         crossindex = pd.merge_asof(
             selected_metadata,
             master_metadata,
@@ -224,10 +289,44 @@ class MultiStoreCrossIndexMixIn:
             by="dummy"
         )
 
+        logger.info("Performing second merge_asof")
+        # perform a second merge
+        # so situations where the master camera 
+        # managed to produced to frames while the
+        # selected camera didn't
+        # dont end up discarding the first of the frames from master
+        crossindex2=pd.merge_asof(
+            master_metadata,
+            selected_metadata,
+            direction="backward",
+            tolerance=1000,
+            left_on="master_ft",
+            right_on="selected_ft",
+            by="dummy"
+        )
+        logger.info("Done")
+        logger.info("Computing frame_number of missing master frames")
+        missing_master_fns = set(crossindex2["master_fn"]).difference(crossindex["master_fn"])
+
+        logger.info("Adding missing master frames to cross-index")
+        crossindex=pd.concat([
+            crossindex,
+            crossindex2.loc[crossindex2["master_fn"].isin(missing_master_fns)]
+        ])
+
+        logger.info("Sorting cross-index")
+        crossindex.sort_values(["selected_ft", "master_ft"], inplace=True)       
+        crossindex.reset_index(inplace=True)
+        crossindex.drop("index", axis=1, inplace=True)
+
+        assert (np.diff(crossindex["master_fn"][~np.isnan(crossindex["master_fn"])]) < 2).all()
+
         # drop frames from the selected store that happen before any in the master
         # since they are useless
         # crossindex=crossindex[~np.isnan(crossindex["master_fn"])]
         crossindex.drop("dummy", axis=1, inplace=True)
+        logger.info("Done merging")
+
 
         multindex=pd.MultiIndex.from_tuples([
             ("selected", "frame_number"),
@@ -238,25 +337,38 @@ class MultiStoreCrossIndexMixIn:
         crossindex.columns=multindex
 
         for store_name in ["master", "selected"]:
-            for feat in ["frame_number", "frame_time"]:
-                last_nan = np.where(np.isnan(crossindex[(store_name, feat)]))[0].tolist()
-                if last_nan:
-                    last_nan = last_nan[-1]
+            for feature in ["frame_number", "frame_time"]:
+                logger.info(f"Filling nan values in {store_name}, {feature}")
+                nans = np.where(np.isnan(crossindex[(store_name, feature)]))[0].tolist()
+                if nans:
+                    last_nan = nans[-1]
                 else:
                     continue
-                crossindex.loc[:last_nan, (store_name, feat)] = first_value(
-                    crossindex.loc[:last_nan, (store_name, feat)].tolist()
-                )
-                crossindex.loc[:last_nan, (store_name, feat)] = last_value(
-                    crossindex.loc[:last_nan, (store_name, feat)].tolist()
-                )
-                
+                while len(nans) != 0:
 
+                    try:
+                        crossindex.loc[:last_nan+1, (store_name, feature)] = first_value(
+                            crossindex.loc[:last_nan+1, (store_name, feature)].tolist()
+                        )
+                    except IndexError:
+                        pass
+
+                    crossindex.loc[:last_nan, (store_name, feature)] = last_value(
+                        crossindex.loc[:last_nan, (store_name, feature)].tolist()
+                    )
+                    nans = np.where(np.isnan(crossindex[(store_name, feature)]))[0]
+                    if nans:
+                        nans = nans.tolist()
+                    else:
+                        break
+
+        logger.info("Annotating chunk in master store")
         crossindex=self.annotate_chunk("master", crossindex)
+        logger.info("Annotating chunk in selected store")
         crossindex=self.annotate_chunk("selected", crossindex)
 
-        crossindex[("master", "update")] = [False] + (np.diff(crossindex[("master", "frame_time")]) > 0).tolist()
-        crossindex.loc[0, ("master", "update")] = True
-        crossindex[("selected", "update")] = True
+        crossindex[("master", "refresh")] = [False] + (np.diff(crossindex[("master", "frame_time")]) > 0).tolist()
+        crossindex.loc[0, ("master", "refresh")] = True
+        crossindex[("selected", "refresh")] = True
 
         return crossindex
