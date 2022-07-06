@@ -276,7 +276,7 @@ class ImgStoreIndex(object):
         assert what in ('frame_number', 'frame_time', 'index')
         cur = self._conn.cursor()
 
-        with codetiming.Timer(text="Find chunk took {:.8f} seconds to compute"):
+        with codetiming.Timer(text="Find chunk took {:.8f} seconds to compute", logger=logger.debug):
 
             if what == 'index':
                 cur.execute("SELECT chunk, frame_idx FROM frames ORDER BY rowid LIMIT 1 OFFSET {};".format(int(value)))
@@ -304,17 +304,23 @@ class ImgStoreIndex(object):
                 value=float(value)
 
         if past and future:
-            cur.execute("SELECT chunk, frame_idx FROM frames ORDER BY ABS(? - {}) LIMIT 1;".format(what), (value, ))
+            cmd, args = ("SELECT chunk, frame_idx FROM frames ORDER BY ABS(? - {}) LIMIT 1;".format(what), (value, ))
         elif not future:
             # we want only frame_time <= value
             # frame_time - value will be max 0
-            cur.execute("SELECT chunk, frame_idx FROM frames WHERE ({} - ?) <= 0 ORDER BY ABS(? - {}) LIMIT 1;".format(what, what), (value, value))
+            cmd, args = ("SELECT chunk, frame_idx FROM frames WHERE ({} - ?) <= 0 ORDER BY ABS(? - {}) LIMIT 1;".format(what, what), (value, value))
         elif not past:
             # we want only frame_time >= value
             # frame_time - value will be min 0
-            cur.execute("SELECT chunk, frame_idx FROM frames WHERE ({} - ?) >= 0 ORDER BY ABS(? - {}) LIMIT 1;".format(what, what), (value, value))
+            cmd, args = ("SELECT chunk, frame_idx FROM frames WHERE ({} - ?) >= 0 ORDER BY ABS(? - {}) LIMIT 1;".format(what, what), (value, value))
 
-        chunk_n, frame_idx = cur.fetchone()
+        
+        cur.execute(cmd, args)
+        try:
+            chunk_n, frame_idx = cur.fetchone()
+        except Exception as error:
+            logger.error(f"{cmd}, {args} did not return a valid result")
+            raise error
         return chunk_n, frame_idx
 
     def find_all(self, what, value, exact_only=True, past=True, future=True):
