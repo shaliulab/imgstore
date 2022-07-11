@@ -117,6 +117,7 @@ class MultiStoreCrossIndexMixIn:
         if os.path.exists(CROSSINDEX_FILE):
             return self
         elif getattr(self, "_crossindex", None) is None:
+            logger.warning(f"{CROSSINDEX_FILE} not found. Generating now")
             self._make_crossindex()
         
         return self
