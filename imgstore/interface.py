@@ -1,8 +1,9 @@
 import traceback
 import warnings
+import os.path
 import logging
 
-from idtrackerai.constants import EXTENSIONS
+EXTENSIONS={"imgstore": [".yaml", ".yml"], "video": [".mp4", ".avi"]}
 import imgstore.constants
 from confapp import conf, load_config
 import cv2
@@ -22,6 +23,7 @@ class VideoCapture():
     def __init__(self, path, chunk=None):
 
         self._chunk=chunk
+        self._path = path
 
         if type(path) is self.__class__:
             if type(path) is cv2.VideoCapture:
@@ -43,7 +45,7 @@ class VideoCapture():
                     if config.SELECTED_STORE in cap._stores:
                         cap.select_store(config.SELECTED_STORE)
                     else:
-                        raise Exception(f"{config.SELECTED_STORE} is not one of the availble stores in {path}")
+                        raise Exception(f"{config.SELECTED_STORE} is not one of the available stores in {path}")
 
             capture_type = "imgstore"
 
@@ -132,3 +134,51 @@ class VideoCapture():
 
     def __getattr__(self, __name: str):
         return getattr(self._cap, __name)
+
+
+    def __setstate__(self, d):
+
+        self.__dict__ = d
+        if "_path" not in d:
+            basedir = d["_basedir"]
+
+
+            path = os.path.join(basedir, "metadata.yaml")
+            import ipdb; ipdb.set_trace()
+            cap = imgstore.new_for_filename(path)
+            if "_chunk" in d:
+                cap.get_chunk(d["_chunk"])
+            if getattr(config, "MULTI_STORE_ENABLED", False):
+                # check that we are not loading the SELECTED_STORE now! in that case, just leave it
+                # this check is done because in that case:
+                # os.path.dirname(config.SELECTED_STORE) == os.path.basename(cap._basedir)
+                # will be True
+                if os.path.dirname(config.SELECTED_STORE) != os.path.basename(cap._basedir) and config.SELECTED_STORE:
+                    if config.SELECTED_STORE in cap._stores:
+                        cap.select_store(config.SELECTED_STORE)
+                    else:
+                        raise Exception(f"{config.SELECTED_STORE} is not one of the available stores in {path}")
+
+            capture_type = "imgstore"
+
+        else:
+            cap = VideoCapture(d["path"], d["chunk"])
+            capture_type = d["type"]
+            basedir = d["_basedir"]
+            path = d["_path"]
+            
+
+        self._cap = cap
+        self._type = capture_type
+        self._basedir = basedir
+        self._path = path
+
+    def __getstate__(self):
+        d   = {
+            "_path": self._path,
+            "path": self._path,
+            "chunk": self._chunk,
+            "type": self._type,
+            "_basedir": self._basedir,
+        }
+        return d
