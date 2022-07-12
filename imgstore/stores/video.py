@@ -209,21 +209,40 @@ class VideoImgStore(_ImgStore):
             self._capfn = fn
             self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
 
+
+    @property
+    def burn_in_period(self):
+        pass
+        if self._capfn.endswith(".mp4") and os.path.exists(self._capfn_hq):
+            return self._fps * 5
+        else:
+            return -1
+
+
     def _load_image(self, idx):
+
+        if idx < self.burn_in_period:
+            cap  = self._cap_hq
+        else:
+            cap = self._cap
         if self._supports_seeking:
             # only seek if we have to, otherwise take the fast path
             if (idx - self._chunk_current_frame_idx) != 1:
-                self._cap.set(getattr(cv2, "CAP_PROP_POS_FRAMES", 1), idx)
+                cap.set(getattr(cv2, "CAP_PROP_POS_FRAMES", 1), idx)
         else:
-            if idx <= self._chunk_current_frame_idx:
-                self._load_chunk(self._chunk_n, _force=True)
+            raise Exception("Only videos with seeking support enabled")
+            # TODO
+            # Return back support for videos without seeking
+            # support by dealing here both with _cap and _cap_hq 
+            # if idx <= self._chunk_current_frame_idx:
+            #     self._load_chunk(self._chunk_n, _force=True)
 
-            i = self._chunk_current_frame_idx + 1
-            while i < idx:
-                _, img = self._cap.read()
-                i += 1
+            # i = self._chunk_current_frame_idx + 1
+            # while i < idx:
+            #     _, img = cap.read()
+            #     i += 1
 
-        ret, _img = self._cap.read()
+        ret, _img = cap.read()
         assert ret, f"Cannot read frame from {self._capfn}"
         if self._color:
             # almost certainly no-op as opencv usually returns color frames....
@@ -242,12 +261,19 @@ class VideoImgStore(_ImgStore):
 
             self._log.debug('loading chunk %s' % n)
             self._capfn = fn
-            # noinspection PyArgumentList
             self._cap = cv2.VideoCapture(self._capfn)
+            caps = [self._cap]
+
+            self._capfn_hq = os.path.splitext(fn)[0] + ".avi"
+            if self.burn_in_period > 0:
+                self._cap_hq = cv2.VideoCapture(self._capfn_hq)
+                caps.append(self._cap_hq)
+
             self._chunk_current_frame_idx = -1
 
-            if not self._cap.isOpened():
-                raise Exception("OpenCV unable to open %s" % fn)
+            for cap in caps:
+                if not cap.isOpened():
+                    raise Exception("OpenCV unable to open %s" % fn)
 
             self._chunk_md = self._index.get_chunk_metadata(n)
 
