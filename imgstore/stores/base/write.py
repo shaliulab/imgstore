@@ -29,7 +29,7 @@ class WritingStore(abc.ABC):
         self._tN = frame_time
 
         self._frame_n += 1
-        if (self._frame_n % self._chunksize) == 0:
+        if (self._frame_n % self._chunksize) == 0 or (self._frame_n == 10 and self._chunk_n == 0):
             old = self._chunk_n
             new = self._chunk_n + 1
             self._save_chunk(old, new)

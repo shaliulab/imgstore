@@ -167,7 +167,7 @@ class VideoImgStore(_ImgStore):
                     self._codec=self._cv2_fmts['avc1/mp4']
 
 
-                if self._codec == "h264_nvenc":
+                if self._codec == "h264_nvenc" and new != 0:
                     self._cap = cv2cuda.VideoWriter(
                         filename=fn,
                         apiPreference="FFMPEG",
@@ -178,10 +178,17 @@ class VideoImgStore(_ImgStore):
                     )
             
                 else:
+                    if new == 0 and self._codec == "h264_nvenc":
+                        codec = cv2.VideoWriter_fourcc(*"DIVX")
+                        filename = fn.replace(".mp4", ".avi")
+                    else:
+                        codec = self._codec
+                        filename = fn
+
                     self._cap = cv2.VideoWriter(
-                        filename=fn,
+                        filename=filename,
                         apiPreference=cv2.CAP_FFMPEG,
-                        fourcc=self._codec,
+                        fourcc=codec,
                         fps=self._fps,
                         frameSize=(w, h),
                         isColor=self._color
