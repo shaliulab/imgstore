@@ -250,9 +250,17 @@ def imgstore_muxer():
 
     parser = argparse.ArgumentParser(description="""
         Take an existing imgstore and \"remux\" it,
-        so 
+        so a subset of the original store
+        with optionally a different chunk duration
+        is produced
     """)
-    parser.add_argument("--video", type=str, required=True)
+    parser.add_argument("--video", type=str, required=True, help="""
+        Path to input metadata. If this store contains extra cameras
+        their paths should work when relative to the working directory,
+        i.e. if one of the paths is lowres/metadata.yaml,
+        the user needs to set the working directory to the folder
+        that contains the input metadata
+    """)
     parser.add_argument("-s", type=str, default=None, help="""
         XX:XX:XX position from which to start the video
     """
