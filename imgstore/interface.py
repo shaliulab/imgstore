@@ -144,7 +144,6 @@ class VideoCapture():
 
 
             path = os.path.join(basedir, "metadata.yaml")
-            import ipdb; ipdb.set_trace()
             cap = imgstore.new_for_filename(path)
             if "_chunk" in d:
                 cap.get_chunk(d["_chunk"])
