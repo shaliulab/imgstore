@@ -13,7 +13,7 @@ from imgstore.stores.utils.formats import get_formats
 from imgstore.stores.base import _ImgStore
 
 try:
-    import cv2cuda
+    import cv2cuda # type: ignore
     CV2CUDA_AVAILABLE=True
 except Exception:
     cv2cuda=None
