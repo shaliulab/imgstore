@@ -38,7 +38,9 @@ class VideoImgStore(_ImgStore):
     def __init__(self, **kwargs):
 
         self._cap = None
+        self._cap_hq = None
         self._capfn = None
+        self._capfn_hq = None
         self._last_capfn=None
 
 
@@ -156,6 +158,7 @@ class VideoImgStore(_ImgStore):
     def _save_chunk(self, old, new):
         if self._cap is not None:
             self._cap.release()
+            if self._cap_hq is not None: self._cap_hq.release()
             self._save_chunk_metadata(os.path.join(self._basedir, '%06d' % old))
 
         if new is not None:
@@ -215,12 +218,13 @@ class VideoImgStore(_ImgStore):
 
             self._capfn = fn
             self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
+            self.frame_idx = 0
 
 
     @property
     def burn_in_period(self):
         pass
-        if self._capfn.endswith(".mp4") and os.path.exists(self._capfn_hq):
+        if self._capfn.endswith(".mp4") and os.path.exists(self._capfn_hq) and self._cap_hq is not None:
             return self._fps * 5
         else:
             return -1
@@ -265,21 +269,29 @@ class VideoImgStore(_ImgStore):
         if _force or (fn != self._capfn):
             if self._cap is not None:
                 self._cap.release()
+            if self._cap_hq is not None:
+                self._cap_hq.release()
 
             self._log.debug('loading chunk %s' % n)
             self._capfn = fn
             self._cap = cv2.VideoCapture(self._capfn)
             caps = [self._cap]
+            fns = [self._capfn]
 
             self._capfn_hq = os.path.splitext(fn)[0] + ".avi"
             if self.burn_in_period > 0:
                 self._cap_hq = cv2.VideoCapture(self._capfn_hq)
                 caps.append(self._cap_hq)
+                fns.append(self._capfn_hq)
 
             self._chunk_current_frame_idx = -1
 
-            for cap in caps:
+            for fn, cap in zip(fns, caps):
                 if not cap.isOpened():
+                    if fn == self._capfn_hq:
+                        self._log.warning(f"Cannot open {fn}")
+                        self._cap_hq = None
+                    else:
                     raise Exception("OpenCV unable to open %s" % fn)
 
             self._chunk_md = self._index.get_chunk_metadata(n)
@@ -326,6 +338,9 @@ class VideoImgStore(_ImgStore):
             self._cap = None
             self._last_capfn=self._capfn
             self._capfn = None
+        if self._cap_hq is not None:
+            self._cap_hq.release()
+            self._cap_fn = None
 
     def empty(self):
         _ImgStore.empty(self)

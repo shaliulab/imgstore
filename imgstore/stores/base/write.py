@@ -35,6 +35,8 @@ class WritingStore(abc.ABC):
             self._save_chunk(old, new)
             self._chunk_n = new
 
+        self.frame_idx += 1
+
         self.frame_count = self._frame_n
 
 
