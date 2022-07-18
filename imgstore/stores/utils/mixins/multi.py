@@ -358,7 +358,7 @@ class MultiStoreCrossIndexMixIn:
                         crossindex.loc[:last_nan, (store_name, feature)].tolist()
                     )
                     nans = np.where(np.isnan(crossindex[(store_name, feature)]))[0]
-                    if nans:
+                    if len(nans) != 0:
                         nans = nans.tolist()
                     else:
                         break
