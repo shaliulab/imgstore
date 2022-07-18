@@ -143,7 +143,7 @@ class VideoImgStore(_ImgStore):
             frame = ensure_color(img)
         else:
             frame = ensure_grayscale(img)
-    
+
         self._cap.write(frame)
         if self._chunk_current_frame_idx > 0 and not os.path.isfile(self._capfn):
             raise Exception(
@@ -292,7 +292,7 @@ class VideoImgStore(_ImgStore):
                         self._log.warning(f"Cannot open {fn}")
                         self._cap_hq = None
                     else:
-                    raise Exception("OpenCV unable to open %s" % fn)
+                        raise Exception("OpenCV unable to open %s" % fn)
 
             self._chunk_md = self._index.get_chunk_metadata(n)
 
