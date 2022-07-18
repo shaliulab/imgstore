@@ -329,6 +329,14 @@ def new_for_filename(path, **kwargs):
     stores = {"master": new_for_filename_single(path, **kwargs)}
     print("Loaded master imgstore")
     stores.update(load_extra_cameras(path, **kwargs))
+    
+    # Set the selected store to be anything other than master
+    if "selected" not in stores:
+        store_names = list(stores.keys())
+        store_names.pop(store_names.index("master"))
+        selected_store = store_names[0]
+        stores["selected"]=stores[selected_store]
+
     multistore = VideoImgStore(**stores)
     return multistore
 
