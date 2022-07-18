@@ -14,6 +14,7 @@ try:
     ENCODER_FORMAT_CPU="mjpeg/avi" # NO CUDA
 
 except ImportError:
+    logger.info("cv2cuda is not available")
     cv2cuda = None
 
 try:
@@ -148,7 +149,6 @@ def load_and_verify_opencv_formats(**kwargs):
     return available
 
 def load_and_verify_cv2cuda_formats(**kwargs):
-
     if cv2cuda is not None:
         cv2cuda_fourcc = {
             ENCODER_FORMAT_GPU: "h264_nvenc"
