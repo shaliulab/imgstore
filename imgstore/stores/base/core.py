@@ -189,7 +189,6 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
                 t0 = time.time()
                 self._chunk_n_and_chunk_paths = self._find_chunks(chunk_numbers=None)
                 self._log.debug('found %s chunks in in %fs' % (len(self._chunk_n_and_chunk_paths), time.time() - t0))
-
                 if self.index_db_exists:
                     # NOTE:
                     # This is a new feature that just performs a db connection

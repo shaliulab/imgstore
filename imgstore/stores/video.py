@@ -260,6 +260,11 @@ class VideoImgStore(_ImgStore):
             img = ensure_color(_img)
         else:
             img = ensure_grayscale(_img)
+
+        if self._metadata.get("apply_blur", False):
+            # print("Applying gaussian blur")
+            img = cv2.GaussianBlur(img, (0, 0), self._metadata["apply_blur"])
+
         self._last_img = img.copy()
 
         return img, (self._chunk_md['frame_number'][idx], self._chunk_md['frame_time'][idx])
@@ -274,9 +279,14 @@ class VideoImgStore(_ImgStore):
 
             self._log.debug('loading chunk %s' % n)
             self._capfn = fn
-            self._cap = cv2.VideoCapture(self._capfn)
-            caps = [self._cap]
-            fns = [self._capfn]
+
+            caps = []
+            fns = []
+
+            if os.path.exists(self._capfn):
+                self._cap = cv2.VideoCapture(self._capfn)
+                caps.append(self._cap)
+                fns.append(self._capfn)
 
             self._capfn_hq = os.path.splitext(fn)[0] + ".avi"
             if self.burn_in_period > 0:
