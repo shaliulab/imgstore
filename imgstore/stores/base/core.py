@@ -260,6 +260,12 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         else:
             return self._index.find_chunk("frame_number", frame_number)[1]
 
+    def get_root(self):
+        return self._basedir
+
+
+    def get_black_mask(self):
+        return np.zeros(self._metadata["imgshape"], np.uint8) 
 
     @classmethod
     def supports_format(cls, fmt):

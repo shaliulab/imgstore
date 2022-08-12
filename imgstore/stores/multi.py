@@ -38,6 +38,9 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
     def close(self):
         for store_name in self._stores:
             self._stores[store_name].close()
+            
+    def get_root(self):
+        return self._stores["master"]._basedir
 
     @property
     def _capfn(self):
