@@ -85,7 +85,6 @@ def first_value(column):
 
 class MultiStoreCrossIndexMixIn:
 
-
     def _make_crossindex(self):
 
         CROSSINDEX_FILE = os.path.join(self._basedir, "crossindex.db")
@@ -146,6 +145,12 @@ class MultiStoreCrossIndexMixIn:
         cur=self._conn.cursor()
         cur.execute(f"SELECT id FROM {store} WHERE frame_number = {fn};")
         return cur.fetchone()[0]
+
+    def find_chunk_given_id(self, store, id):
+        cur=self._conn.cursor()
+        cur.execute(f"SELECT chunk FROM {store} WHERE id = {id};")
+        return cur.fetchone()[0]
+
 
     def find_master_fn(self, selected_fn):
         """
