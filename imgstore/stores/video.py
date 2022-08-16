@@ -235,7 +235,7 @@ class VideoImgStore(_ImgStore):
 
     def _load_image(self, idx):
 
-        with codetiming.Timer(text="Reading image took {milliseconds:.0f} ms", logger=print):
+        with codetiming.Timer(text="Reading image took {milliseconds:.0f} ms", logger=logger.debug):
 
             if idx < self.burn_in_period:
                 cap  = self._cap_hq
