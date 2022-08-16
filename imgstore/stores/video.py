@@ -20,7 +20,7 @@ except Exception:
     CV2CUDA_AVAILABLE=False
 
 isColor=False
-
+ONLY_ALLOW_EVEN_SIDES=True
 
 def find_chunks_video(basedir, ext, chunk_numbers=None):
     if chunk_numbers is None:
@@ -229,6 +229,19 @@ class VideoImgStore(_ImgStore):
         else:
             return -1
 
+    @staticmethod
+    def _read(cap):
+        ret, img = cap.read()
+        if ONLY_ALLOW_EVEN_SIDES:
+            dims = list(img.shape)
+            for i, dimension in enumerate(img.shape):
+                if dimension % 2 != 0:
+                    dims[i] -= 1
+            
+            img = img[:dims[0], :dims[1]].copy(order="C")
+        return ret, img               
+
+
 
     def _load_image(self, idx):
 
@@ -253,7 +266,7 @@ class VideoImgStore(_ImgStore):
             #     _, img = cap.read()
             #     i += 1
 
-        ret, _img = cap.read()
+        ret, _img = self._read(cap)
         assert ret, f"Cannot read frame from {self._capfn}"
         if self._color:
             # almost certainly no-op as opencv usually returns color frames....
@@ -332,7 +345,7 @@ class VideoImgStore(_ImgStore):
         try:
             if frame_n > 0:
                 cap.set(getattr(cv2, "CAP_PROP_POS_FRAMES", 1), frame_n)
-            _, img = cap.read()
+            _, img = self._read(cap)
             return img
         finally:
             cap.release()
