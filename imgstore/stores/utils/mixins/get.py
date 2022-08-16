@@ -1,6 +1,12 @@
-_VERBOSE_DEBUG_GETS = False
+import logging
 
+import codetiming
 from imgstore.constants import VERBOSE_DEBUG_CHUNKS
+
+
+_VERBOSE_DEBUG_GETS = False
+logger = logging.getLogger(__name__)
+
 
 class GetMixin:
 
@@ -64,11 +70,14 @@ class GetMixin:
 
     def _get_image(self, chunk_n, frame_idx):
         if chunk_n is not None:
-            self._load_chunk(chunk_n)
+            with codetiming.Timer(text="Loading chunk took {milliseconds:.0f} ms", logger=logger.debug):
+                self._load_chunk(chunk_n)
 
         # ensure the read works before setting frame_number
-        _img, (_frame_number, _frame_timestamp) = self._load_image(frame_idx)
-        img = self._decode_image(_img)
+        with codetiming.Timer(text="Loading image took {milliseconds:.0f} ms", logger=logger.debug):
+            _img, (_frame_number, _frame_timestamp) = self._load_image(frame_idx)
+        with codetiming.Timer(text="Decoding image took {milliseconds:.0f} ms", logger=logger.debug):
+            img = self._decode_image(_img)
         self._chunk_current_frame_idx = frame_idx
         self.frame_number = _frame_number
         self.frame_time = _frame_timestamp

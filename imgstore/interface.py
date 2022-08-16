@@ -10,57 +10,64 @@ import cv2
 
 logger = logging.getLogger(__name__)
 
-config = load_config(imgstore.constants)
-
-MULTI_STORE_ENABLED=getattr(config, "MULTI_STORE_ENABLED", False)
-if MULTI_STORE_ENABLED:
-    import imgstore.stores.multi as imgstore
-else:
-    import imgstore.stores as imgstore
-
 class VideoCapture():
 
     def __init__(self, path, chunk=None):
-
-        self._chunk=chunk
-        self._path = path
-
-        if type(path) is self.__class__:
-            if type(path) is cv2.VideoCapture:
-                cap = path
-                capture_type = "opencv"
-            elif type(path) is imgstore.VideoImgStore:
-                cap = path
-                capture_type = "imgstore"
-                if self._chunk is None:
-                    logger.info("Selecting chunk {config.CHUNK}")
-                    self._chunk=config.CHUNK
-                  
-        
-        elif any([path.endswith(ext) for ext in EXTENSIONS["imgstore"]]):
-            cap = imgstore.new_for_filename(path)
-            cap.get_chunk(self._chunk)
-            if getattr(config, "MULTI_STORE_ENABLED", False):
-                if config.SELECTED_STORE:
-                    if config.SELECTED_STORE in cap._stores:
-                        cap.select_store(config.SELECTED_STORE)
-                    else:
-                        raise Exception(f"{config.SELECTED_STORE} is not one of the available stores in {path}")
-
-            capture_type = "imgstore"
-
-        elif any(path.endswith(ext) for ext in EXTENSIONS["video"]):
-            cap = cv2.VideoCapture(path)
-            capture_type = "opencv"
-
+        import imgstore.constants
+        config = load_config(imgstore.constants)
+        self._config = config
+        MULTI_STORE_ENABLED=getattr(config, "MULTI_STORE_ENABLED", False)
+        if MULTI_STORE_ENABLED:
+            import imgstore.stores.multi as imgstore
         else:
-            raise Exception(f"Passed path {path} is not supported")
+            import imgstore.stores as imgstore
 
-        self._cap = cap
-        self._type = capture_type
+        self._multi_store_enabled = MULTI_STORE_ENABLED
+
+        try:
+
+            self._chunk=chunk
+            self._path = path
+
+            if type(path) is self.__class__:
+                if type(path) is cv2.VideoCapture:
+                    cap = path
+                    capture_type = "opencv"
+                elif type(path) is imgstore.VideoImgStore:
+                    cap = path
+                    capture_type = "imgstore"
+                    if self._chunk is None:
+                        logger.info("Selecting chunk {config.CHUNK}")
+                        self._chunk=config.CHUNK
+                    
+            
+            elif any([path.endswith(ext) for ext in EXTENSIONS["imgstore"]]):
+                cap = imgstore.new_for_filename(path)
+                cap.get_chunk(self._chunk)
+                if getattr(config, "MULTI_STORE_ENABLED", False):
+                    if config.SELECTED_STORE:
+                        if config.SELECTED_STORE in cap._stores:
+                            cap.select_store(config.SELECTED_STORE)
+                        else:
+                            raise Exception(f"{config.SELECTED_STORE} is not one of the available stores in {path}")
+
+                capture_type = "imgstore"
+
+            elif any(path.endswith(ext) for ext in EXTENSIONS["video"]):
+                cap = cv2.VideoCapture(path)
+                capture_type = "opencv"
+
+            else:
+                raise Exception(f"Passed path {path} is not supported")
+
+            self._cap = cap
+            self._type = capture_type
+        except:
+            import ipdb; ipdb.set_trace()
+
 
     def _get(self, property):
-        if MULTI_STORE_ENABLED and type(self._cap) is imgstore.VideoImgStore:
+        if self._multi_store_enabled and type(self._cap) is imgstore.VideoImgStore:
             return self._cap.get(property)
 
 
@@ -147,16 +154,16 @@ class VideoCapture():
             cap = imgstore.new_for_filename(path)
             if "_chunk" in d:
                 cap.get_chunk(d["_chunk"])
-            if getattr(config, "MULTI_STORE_ENABLED", False):
+            if getattr(self._config, "MULTI_STORE_ENABLED", False):
                 # check that we are not loading the SELECTED_STORE now! in that case, just leave it
                 # this check is done because in that case:
                 # os.path.dirname(config.SELECTED_STORE) == os.path.basename(cap._basedir)
                 # will be True
-                if os.path.dirname(config.SELECTED_STORE) != os.path.basename(cap._basedir) and config.SELECTED_STORE:
-                    if config.SELECTED_STORE in cap._stores:
-                        cap.select_store(config.SELECTED_STORE)
+                if os.path.dirname(self._config.SELECTED_STORE) != os.path.basename(cap._basedir) and self._config.SELECTED_STORE:
+                    if self._config.SELECTED_STORE in cap._stores:
+                        cap.select_store(self._config.SELECTED_STORE)
                     else:
-                        raise Exception(f"{config.SELECTED_STORE} is not one of the available stores in {path}")
+                        raise Exception(f"{self._config.SELECTED_STORE} is not one of the available stores in {path}")
 
             capture_type = "imgstore"
 

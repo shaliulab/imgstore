@@ -5,6 +5,7 @@ import glob
 import operator
 import warnings
 
+import codetiming
 import cv2
 import numpy as np
 from imgstore.constants import STORE_MD_KEY, VERBOSE_DEBUG_CHUNKS
@@ -21,6 +22,8 @@ except Exception:
 
 isColor=False
 ONLY_ALLOW_EVEN_SIDES=True
+
+logger = logging.getLogger(__name__)
 
 def find_chunks_video(basedir, ext, chunk_numbers=None):
     if chunk_numbers is None:
@@ -139,6 +142,7 @@ class VideoImgStore(_ImgStore):
 
     def _save_image(self, img, frame_number, frame_time):
         # we always write color because its more supported
+            
         if self._color:
             frame = ensure_color(img)
         else:
@@ -245,40 +249,55 @@ class VideoImgStore(_ImgStore):
 
     def _load_image(self, idx):
 
-        if idx < self.burn_in_period:
-            cap  = self._cap_hq
-        else:
-            cap = self._cap
-        if self._supports_seeking:
-            # only seek if we have to, otherwise take the fast path
-            if (idx - self._chunk_current_frame_idx) != 1:
-                cap.set(getattr(cv2, "CAP_PROP_POS_FRAMES", 1), idx)
-        else:
-            raise Exception("Only videos with seeking support enabled")
-            # TODO
-            # Return back support for videos without seeking
-            # support by dealing here both with _cap and _cap_hq 
-            # if idx <= self._chunk_current_frame_idx:
-            #     self._load_chunk(self._chunk_n, _force=True)
 
-            # i = self._chunk_current_frame_idx + 1
-            # while i < idx:
-            #     _, img = cap.read()
-            #     i += 1
+        with codetiming.Timer(text="Reading image took {milliseconds:.0f} ms", logger=logger.debug):
 
-        ret, _img = self._read(cap)
-        assert ret, f"Cannot read frame from {self._capfn}"
-        if self._color:
-            # almost certainly no-op as opencv usually returns color frames....
-            img = ensure_color(_img)
-        else:
-            img = ensure_grayscale(_img)
+            if idx < self.burn_in_period:
+                cap  = self._cap_hq
+            else:
+                cap = self._cap
+            
+            if (idx - self._chunk_current_frame_idx) == 0 and self._last_img is not None:
+                ret = True
+                _img = self._last_img.copy()
+
+            else:
+                if self._supports_seeking:
+                    # only seek if we have to, otherwise take the fast path
+                    if (idx - self._chunk_current_frame_idx) != 1:
+                        # print(f"{idx - self._chunk_current_frame_idx} frames in the future")
+                        cap.set(getattr(cv2, "CAP_PROP_POS_FRAMES", 1), idx)
+                else:
+                    raise Exception("Only videos with seeking support enabled")
+                    # TODO
+                    # Return back support for videos without seeking
+                    # support by dealing here both with _cap and _cap_hq 
+                    # if idx <= self._chunk_current_frame_idx:
+                    #     self._load_chunk(self._chunk_n, _force=True)
+
+                    # i = self._chunk_current_frame_idx + 1
+                    # while i < idx:
+                    #     _, img = cap.read()
+                    #     i += 1
+
+                ret, _img = self._read(cap)
+
+            assert ret, f"Cannot read frame from {self._capfn}"
+
+        with codetiming.Timer(text="Ensuring color or grayscale took {milliseconds:.0f} ms", logger=logger.debug):
+            if self._color:
+                # almost certainly no-op as opencv usually returns color frames....
+                img = ensure_color(_img)
+            else:
+                img = ensure_grayscale(_img)
 
         if self._metadata.get("apply_blur", False):
-            # print("Applying gaussian blur")
-            img = cv2.GaussianBlur(img, (0, 0), self._metadata["apply_blur"])
+            with codetiming.Timer(text="Applying gaussian blur took {milliseconds:.0f} ms", logger=logger.debug):
+                # print("Applying gaussian blur")
+                img = cv2.GaussianBlur(img, (0, 0), self._metadata["apply_blur"])
 
-        self._last_img = img.copy()
+        with codetiming.Timer(text="Copying image took {milliseconds:.0f} ms", logger=logger.debug):
+            self._last_img = img.copy()
 
         return img, (self._chunk_md['frame_number'][idx], self._chunk_md['frame_time'][idx])
 
@@ -331,8 +350,7 @@ class VideoImgStore(_ImgStore):
     def supports_format(cls, fmt):
         return fmt in cls._cv2_fmts
 
-    @staticmethod
-    def _extract_only_frame(basedir, chunk_n, frame_n, smd):
+    def _extract_only_frame(self, basedir, chunk_n, frame_n, smd):
         capfn = os.path.join(basedir, '%06d%s' % (chunk_n,
                                                   VideoImgStore._get_chunk_extension(smd)))
         # noinspection PyArgumentList
