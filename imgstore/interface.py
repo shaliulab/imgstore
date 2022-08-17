@@ -49,7 +49,7 @@ class VideoCapture():
                         if config.SELECTED_STORE in cap._stores:
                             cap.select_store(config.SELECTED_STORE)
                         else:
-                            raise Exception(f"{config.SELECTED_STORE} is not one of the available stores in {path}")
+                            raise Exception(f"{config.SELECTED_STORE} is not one of the available stores in {path}. Available stors {cap._stores.keys()}")
 
                 capture_type = "imgstore"
 
@@ -135,15 +135,19 @@ class VideoCapture():
 
 
     def set(self, property, value):
-
         if type(property) is str:
             return self._set(property, value)
         else:
             return self._cap.set(property, value)
 
 
-    def __getattr__(self, __name: str):
-        return getattr(self._cap, __name)
+    def __getattr__(self, k: str):
+        # print(k)
+        store = self._cap
+        if k in dir(store):
+            return getattr(store, k)
+        else:
+            return getattr(store._stores[store.main], k)
 
 
     def __setstate__(self, d):

@@ -85,22 +85,25 @@ def first_value(column):
 
 class MultiStoreCrossIndexMixIn:
 
+    @property
+    def crossindex_file(self):
+        return os.path.join(self._stores["master"]._basedir, "crossindex.db")
+
     def _make_crossindex(self):
 
-        CROSSINDEX_FILE = os.path.join(self._basedir, "crossindex.db")
-        if os.path.exists(CROSSINDEX_FILE):
-            logger.info(f"Loading cached crossindex --> {CROSSINDEX_FILE}")
+        if os.path.exists(self.crossindex_file):
+            logger.info(f"Loading cached crossindex --> {self.crossindex_file}")
         else:
             logger.info("Generating crossindex. This may take a few seconds")
             with codetiming.Timer(text="Generated cross-index in {:.8f} seconds", logger=logger.info):
                 self._crossindex=self.build_crossindex()
-            logger.info(f"Saving to sqlite file -> {CROSSINDEX_FILE}. This may take a few seconds")
-            self._save_to_sqlite(CROSSINDEX_FILE)
+            logger.info(f"Saving to sqlite file -> {self.crossindex_file}. This may take a few seconds")
+            self._save_to_sqlite(self.crossindex_file)
 
         logger.info("Done")
 
-    def _save_to_sqlite(self, CROSSINDEX_FILE):
-        with sqlite3.connect(CROSSINDEX_FILE) as conn:
+    def _save_to_sqlite(self, crossindex_file):
+        with sqlite3.connect(crossindex_file) as conn:
             self._crossindex["master"].to_sql(name="master", con=conn, index_label="id")
             self._crossindex["selected"].to_sql(name="selected", con=conn, index_label="id")
             cur=conn.cursor()
@@ -112,11 +115,10 @@ class MultiStoreCrossIndexMixIn:
     @property
     def crossindex(self):
 
-        CROSSINDEX_FILE = os.path.join(self._basedir, "crossindex.db")
-        if os.path.exists(CROSSINDEX_FILE):
+        if os.path.exists(self.crossindex_file):
             return self
         elif getattr(self, "_crossindex", None) is None:
-            logger.warning(f"{CROSSINDEX_FILE} not found. Generating now")
+            logger.warning(f"{self.crossindex_file} not found. Generating now")
             self._make_crossindex()
         
         return self
@@ -124,15 +126,16 @@ class MultiStoreCrossIndexMixIn:
 
     @property
     def _conn(self):
-        CROSSINDEX_FILE = os.path.join(self._basedir, "crossindex.db")
-        if not os.path.exists(CROSSINDEX_FILE):
+        if not os.path.exists(self.crossindex_file):
             self._make_crossindex()
 
-        self.__conn = sqlite3.connect(CROSSINDEX_FILE)
+        self.__conn = sqlite3.connect(self.crossindex_file)
         return self.__conn
 
     def find_fn_given_id(self, store, id):
         cur=self._conn.cursor()
+        if store == "main":
+            store = self.main
         cur.execute(f"SELECT frame_number FROM {store} WHERE id = {id};")
         return cur.fetchone()[0]
     
@@ -143,6 +146,11 @@ class MultiStoreCrossIndexMixIn:
         """
 
         cur=self._conn.cursor()
+        
+        if store == "main":
+            store = self.main
+
+
         cur.execute(f"SELECT id FROM {store} WHERE frame_number = {fn};")
         return cur.fetchone()[0]
 
@@ -183,6 +191,10 @@ class MultiStoreCrossIndexMixIn:
         cur.execute(f"SELECT frame_number FROM master;")
         return cur.fetchall()
 
+    def get_all_fn(self, feed):
+        cur=self._conn.cursor()
+        cur.execute(f"SELECT frame_number FROM {feed};")
+        return cur.fetchall()
 
     def get_number_of_frames(self):
         cur=self._conn.cursor()
@@ -234,7 +246,7 @@ class MultiStoreCrossIndexMixIn:
             whith a new column "chunk" under the passed store.
         """
 
-        start_of_chunk = getattr(self, f"_{store_name}")._index.get_start_of_chunks()
+        start_of_chunk = self._stores[store_name]._index.get_start_of_chunks()
         multindex=pd.MultiIndex.from_tuples([
             (store_name, "chunk"),
             (store_name, "frame_number"),
@@ -265,15 +277,16 @@ class MultiStoreCrossIndexMixIn:
         needs to update the master with this frame when the corresponding selected frame
         (in the same row) is played
         """
+        print("Building crossindex")
 
         logger.info("Loading metadata from selected store")
         selected_metadata = pd.DataFrame.from_dict(
-            self._selected.frame_metadata
+            self._stores["selected"].frame_metadata
         )
 
         logger.info("Loading metadata from master store")
         master_metadata = pd.DataFrame.from_dict(
-            self._master.frame_metadata
+            self._stores["master"].frame_metadata
         )
         selected_metadata.columns = ["selected_fn", "selected_ft"]
         master_metadata.columns = ["master_fn", "master_ft"]

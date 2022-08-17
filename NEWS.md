@@ -22,3 +22,15 @@
 
 
 * Add main_muxer
+
+
+0.4.17
+
+=============================
+
+Decouple master/selected from main/secondary
+
+* master store is the feed passed as main view. it gets renamed to main later downstream,
+and master becomes then highres always
+* selected store is the store added as a secondary view. it gets renamed to secondary later downstream,
+and selected becomes then highspeed always
