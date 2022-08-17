@@ -62,11 +62,14 @@ class VideoCapture():
 
             self._cap = cap
             self._type = capture_type
-        except:
+        except Exception as error:
+            print(traceback.print_exc())
+            print(error)
             import ipdb; ipdb.set_trace()
 
 
     def _get(self, property):
+
         if self._multi_store_enabled and type(self._cap) is imgstore.VideoImgStore:
             return self._cap.get(property)
 

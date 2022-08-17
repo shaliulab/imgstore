@@ -19,6 +19,7 @@ from imgstore.stores.utils.mixins.multi import MultiStoreCrossIndexMixIn
 from confapp import conf, load_config
 from imgstore import constants
 config = load_config(constants)
+from imgstore.util import ensure_color, ensure_grayscale
 
 logger = logging.getLogger(__name__)
 _VERBOSE_DEBUG_GETS = False
@@ -29,7 +30,7 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
     def __init__(self, **stores):
         self._stores = stores
         self._master = stores["master"]
-        self._selected = stores.get("lowres/metadata.yaml", stores["master"])
+        self._selected = stores["selected"]
         self._selected_name = "master"
         self._index = self._master._index
         self._basedir = self._master._basedir
@@ -60,19 +61,29 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
         assert len(imgs) >= 1
 
         shape = imgs[0].shape
+        shapes = np.vstack([img.shape for img in imgs])
+        max_height, max_width = shapes.max(0)
+
         reshaped_imgs=[]
 
         for img in imgs:
 
-            if len(shape) > len(img.shape):
-                img = np.stack([img, ] * 3, axis=2)
-            elif len(shape) < len(img.shape):
-                img = img[:, :, 0]
+            if len(shape) == 3:
+                img = ensure_color(img)
+            if len(shape) == 2:
+                img = ensure_grayscale(img)
 
             reshaped_imgs.append(
-                cv2.resize(img, shape[:2][::-1], cv2.INTER_NEAREST)
+                cv2.copyMakeBorder(
+                    img,
+                    top=0,
+                    bottom=max(0, max_height-img.shape[0]),
+                    right=max(0, max_width-img.shape[1]),
+                    left=0,
+                    borderType=cv2.BORDER_CONSTANT,
+                    value=255
+                )
             )
-       
         img=np.concatenate(reshaped_imgs, axis=1)
 
         if getattr(config, "COLOR", False) and len(img.shape) == 2:
@@ -125,11 +136,16 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
         master_img, master_meta = self.get_next_image_single_store("master", master_fn)
         selected_img, selected_meta = self.get_next_image_single_store("selected", selected_fn)
 
-        imgs=[master_img, selected_img]
+        if conf.FIRST_FEED == "master":
+            imgs=[master_img, selected_img]
+        elif conf.FIRST_FEED == "selected":
+            imgs=[selected_img, master_img]
+        else:
+            raise Exception("Please specify which feed should be shown to the left ")
 
         with codetiming.Timer(text="_apply_layout took {:.8f} seconds to compute", logger=logger.debug):
             img = self._apply_layout(imgs)
-        
+
         meta = (id, selected_meta[1])
         self._crossindex_pointer =id
         return img, meta
@@ -311,20 +327,10 @@ def load_extra_cameras(path, **kwargs):
     stores = {}
 
     metadata = _extract_store_metadata(path)
+    root_dir = os.path.dirname(path)
     for camera in metadata.get(METADATA_KEY, []):
-        try:
-            stores[camera] = new_for_filename_single(camera, **kwargs)
-            print(f"Loaded {camera} imgstore")
-
-        except FileNotFoundError:
-            if os.path.isfile(path):
-                master_path = os.path.dirname(path)
-            else:
-                master_path = path
-
-            find_path_to_camera = os.path.join(master_path, camera)
-            assert os.path.exists(find_path_to_camera), f"{find_path_to_camera} does not exist"
-            stores[camera] = new_for_filename_single(find_path_to_camera, **kwargs)
+        stores[camera] = new_for_filename_single(os.path.join(root_dir, camera), **kwargs)
+        print(f"Loaded {camera} imgstore")
 
     return stores
 
@@ -337,8 +343,26 @@ def new_for_filename(path, **kwargs):
     if "selected" not in stores:
         store_names = list(stores.keys())
         store_names.pop(store_names.index("master"))
-        selected_store = store_names[0]
-        stores["selected"]=stores[selected_store]
+        if len(store_names) > 0:
+            selected_store = store_names[0]
+            stores["selected"]=stores[selected_store]
+        else:
+            warnings.warn(f"No extra_cameras found in {os.path.realpath(stores['master']._basedir)}")
+
+    # NOTE
+    # I have assumed in many parts of the c ode that selected is the high_speed feed
+    # and master is the high_res feed.
+    # This means if I try to read an high_speed imgstore,
+    # I need to swap the identity of master and selected
+    if "lowres" in os.path.realpath(stores["master"]._basedir) and \
+        not "lowres" in os.path.realpath(stores["selected"]._basedir):
+        stores["_master"] = stores["selected"]
+        stores["_selected"] = stores["master"]
+        stores["selected"] = stores["_selected"]
+        stores["master"] = stores["_master"]
+        del stores["_selected"] 
+        del stores["_master"] 
+        
 
     multistore = VideoImgStore(**stores)
     return multistore

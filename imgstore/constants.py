@@ -28,3 +28,4 @@ COLOR=True
 SELECTED_STORE="lowres/metadata.yaml"
 LOOKUP_NEAREST=False
 LOGGING_FILE=os.path.join(os.environ["HOME"], ".config", "imgstore", "logging.yml")
+FIRST_FEED="master"
