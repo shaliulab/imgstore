@@ -40,7 +40,7 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
 
     @property
     def _index(self):
-        return self._stores[self.main]._index
+        return self._stores["selected"]._index
     
     @property
     def _basedir(self):
