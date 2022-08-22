@@ -327,9 +327,9 @@ class VideoImgStore(_ImgStore):
                 fns.append(self._capfn)
 
             self._capfn_hq = os.path.splitext(fn)[0] + ".avi"
-                self._cap_hq = cv2.VideoCapture(self._capfn_hq)
-                caps.append(self._cap_hq)
-                fns.append(self._capfn_hq)
+            self._cap_hq = cv2.VideoCapture(self._capfn_hq)
+            caps.append(self._cap_hq)
+            fns.append(self._capfn_hq)
 
             self._chunk_current_frame_idx = -1
 
