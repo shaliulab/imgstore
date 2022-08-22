@@ -53,7 +53,7 @@ class PickleMixIn:
                     apiPreference=apiPreference,
                     fourcc=codec,
                     frameSize=self._imgshape[:2][::-1],
-                    fps=self._fps,
+                    fps=self.fps,
                     isColor=self._color,
                 )
                 self._last_capfn=None

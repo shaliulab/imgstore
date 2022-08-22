@@ -216,6 +216,12 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
             assert self._chunk_n == 0
             self.frame_number = np.nan  # we haven't read any frames yet
 
+    @property
+    def fps(self):
+        if "framerate" in self._metadata:
+            return self._metadata["framerate"]
+        else:
+            return self._fps
 
     def _calculate_image_shape(self, imgshape, fmt):
         _imgshape = list(imgshape)

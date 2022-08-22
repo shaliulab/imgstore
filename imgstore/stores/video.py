@@ -179,7 +179,7 @@ class VideoImgStore(_ImgStore):
                         filename=fn,
                         apiPreference="FFMPEG",
                         fourcc="h264_nvenc",
-                        fps=self._fps,
+                        fps=self.fps,
                         frameSize=(w, h),
                         isColor=self._color
                     )
@@ -196,7 +196,7 @@ class VideoImgStore(_ImgStore):
                         filename=filename,
                         apiPreference=cv2.CAP_FFMPEG,
                         fourcc=codec,
-                        fps=self._fps,
+                        fps=self.fps,
                         frameSize=(w, h),
                         isColor=self._color
                     )
@@ -215,7 +215,7 @@ class VideoImgStore(_ImgStore):
                 self._cap = cv2.VideoWriter(
                     filename=fn,
                     fourcc=self._codec,
-                    fps=self._fps,
+                    fps=self.fps,
                     frameSize=(w, h),
                     isColor=self._color
                 )
@@ -229,7 +229,7 @@ class VideoImgStore(_ImgStore):
     def burn_in_period(self):
         pass
         if self._capfn.endswith(".mp4") and os.path.exists(self._capfn_hq) and self._cap_hq is not None:
-            return self._fps * 5
+            return self.fps * 5
         else:
             return -1
 
@@ -321,7 +321,6 @@ class VideoImgStore(_ImgStore):
                 fns.append(self._capfn)
 
             self._capfn_hq = os.path.splitext(fn)[0] + ".avi"
-            if self.burn_in_period > 0:
                 self._cap_hq = cv2.VideoCapture(self._capfn_hq)
                 caps.append(self._cap_hq)
                 fns.append(self._capfn_hq)
