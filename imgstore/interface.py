@@ -14,13 +14,14 @@ class VideoCapture():
 
     def __init__(self, path, chunk=None):
         import imgstore.constants
-        config = load_config(imgstore.constants)
-        self._config = config
-        MULTI_STORE_ENABLED=getattr(config, "MULTI_STORE_ENABLED", False)
+        self._config = load_config(imgstore.constants)
+
+        MULTI_STORE_ENABLED=getattr(self._config, "MULTI_STORE_ENABLED", False)
         if MULTI_STORE_ENABLED:
             import imgstore.stores.multi as imgstore
         else:
             import imgstore.stores as imgstore
+            self._stores = {"main": self}
 
         self._multi_store_enabled = MULTI_STORE_ENABLED
 
@@ -38,18 +39,18 @@ class VideoCapture():
                     capture_type = "imgstore"
                     if self._chunk is None:
                         logger.info("Selecting chunk {config.CHUNK}")
-                        self._chunk=config.CHUNK
+                        self._chunk=self._config.CHUNK
                     
             
             elif any([path.endswith(ext) for ext in EXTENSIONS["imgstore"]]):
                 cap = imgstore.new_for_filename(path)
                 cap.get_chunk(self._chunk)
-                if getattr(config, "MULTI_STORE_ENABLED", False):
-                    if config.SELECTED_STORE:
-                        if config.SELECTED_STORE in cap._stores:
-                            cap.select_store(config.SELECTED_STORE)
+                if getattr(self._config, "MULTI_STORE_ENABLED", False):
+                    if self._config.SELECTED_STORE:
+                        if self._config.SELECTED_STORE in cap._stores:
+                            cap.select_store(self._config.SELECTED_STORE)
                         else:
-                            raise Exception(f"{config.SELECTED_STORE} is not one of the available stores in {path}. Available stors {cap._stores.keys()}")
+                            raise Exception(f"{self._config.SELECTED_STORE} is not one of the available stores in {path}. Available stors {cap._stores.keys()}")
 
                 capture_type = "imgstore"
 
