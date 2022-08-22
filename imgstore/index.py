@@ -369,3 +369,10 @@ class ImgStoreIndex(object):
         cur = self._conn.cursor()
         cur.execute("SELECT chunk, frame_number from frames where frame_idx == 0;")
         return cur.fetchall()
+
+    def get_timestamps(self, chunks):
+
+        cur = self._conn.cursor()
+        seq = ",".join([str(chunk) for chunk in chunks])
+        cur.execute(f"SELECT frame_time FROM frames WHERE chunk in ({seq});")
+        return cur.fetchall()
