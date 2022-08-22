@@ -285,6 +285,8 @@ class VideoImgStore(_ImgStore):
                 ret, _img = self._read(cap)
                 if not ret:
                     return None, (None, None)
+                if cap is self._cap_hq:
+                    self._cap.set(getattr(cv2, "CAP_PROP_POS_FRAMES", 1), idx+1)
 
             assert ret, f"Cannot read frame from {self._capfn}"
 
