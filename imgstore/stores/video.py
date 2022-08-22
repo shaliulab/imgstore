@@ -236,6 +236,8 @@ class VideoImgStore(_ImgStore):
     @staticmethod
     def _read(cap):
         ret, img = cap.read()
+        if not ret:
+            return ret, None
         if ONLY_ALLOW_EVEN_SIDES:
             dims = list(img.shape)
             for i, dimension in enumerate(img.shape):
@@ -281,6 +283,8 @@ class VideoImgStore(_ImgStore):
                     #     i += 1
 
                 ret, _img = self._read(cap)
+                if not ret:
+                    return None, (None, None)
 
             assert ret, f"Cannot read frame from {self._capfn}"
 
