@@ -248,17 +248,24 @@ class VideoImgStore(_ImgStore):
         return ret, img               
 
 
-
     def _load_image(self, idx):
+        try:
+            with open("debug_imgstore.txt", "r") as filehandle:
+                message = filehandle.read().strip("\n")
+        except:
+            message = "no-debug"
 
 
         with codetiming.Timer(text="Reading image took {milliseconds:.0f} ms", logger=logger.debug):
 
             if idx < self.burn_in_period:
                 cap  = self._cap_hq
+                if message == "debug": print("Loading from high quality capture")
             else:
                 cap = self._cap
-            
+                if message == "debug": print("Loading from normal capture")
+
+
             if (idx - self._chunk_current_frame_idx) == 0 and self._last_img is not None:
                 ret = True
                 _img = self._last_img.copy()
@@ -299,7 +306,6 @@ class VideoImgStore(_ImgStore):
 
         if self._metadata.get("apply_blur", False):
             with codetiming.Timer(text="Applying gaussian blur took {milliseconds:.0f} ms", logger=logger.debug):
-                # print("Applying gaussian blur")
                 img = cv2.GaussianBlur(img, (0, 0), self._metadata["apply_blur"])
 
         with codetiming.Timer(text="Copying image took {milliseconds:.0f} ms", logger=logger.debug):
