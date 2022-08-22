@@ -36,6 +36,7 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
 
         self._stores = stores
         self._crossindex_pointer =0
+        self.is_multistore = True
 
     @property
     def _index(self):
