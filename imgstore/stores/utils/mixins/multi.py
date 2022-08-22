@@ -388,6 +388,7 @@ class MultiStoreCrossIndexMixIn:
 
         crossindex[("master", "refresh")] = [False] + (np.diff(crossindex[("master", "frame_time")]) > 0).tolist()
         crossindex.loc[0, ("master", "refresh")] = True
-        crossindex[("selected", "refresh")] = True
+        crossindex[("selected", "refresh")] = [False] + (np.diff(crossindex[("selected", "frame_time")]) > 0).tolist()
+        crossindex.loc[0, ("selected", "refresh")] = True
 
         return crossindex
