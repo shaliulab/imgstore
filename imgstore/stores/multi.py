@@ -134,7 +134,6 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
                 self._stores[self._config.FIRST_FEED]._metadata["imgshape"][0],
                 self._stores[self._config.FIRST_FEED]._metadata["imgshape"][1] * len(self._stores)
             )
-            self._index = self._stores["selected"]._index
             self._make_crossindex()
             self._stores["selected"] = self._stores["selected"]
         except KeyError:
