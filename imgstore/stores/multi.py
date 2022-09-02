@@ -73,7 +73,7 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
         elif self._config.FIRST_FEED == "selected":
             imgs=imgs[::-1]
         else:
-            raise Exception("Please specify which feed should be shown to the left ")
+            raise Exception("Please specify which feed should be shown to the left. Either master or selected")
 
         shape = imgs[0].shape
         shapes = np.vstack([img.shape for img in imgs])
