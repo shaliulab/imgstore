@@ -1,7 +1,7 @@
 import re
 import datetime
 import collections
-
+import os.path
 import cv2
 import json
 
@@ -259,3 +259,17 @@ def motif_extra_data_h5_to_df(store, path):
         dat['sample_delay'] = np.asarray(f['sample_delay'])[mask]
 
         return pd.DataFrame(dat)
+
+
+def load_config(store):
+    if store.is_multistore:
+        raise ValueError("Only single stores supported")
+    else:
+        basedir = os.path.realpath(store._basedir)
+
+    config_path = os.path.join(basedir, os.path.basename(basedir) + ".conf")
+
+    with open(config_path, "r") as filehandle:
+        config=json.load(filehandle)
+
+    return config
