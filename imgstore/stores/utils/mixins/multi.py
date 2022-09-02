@@ -338,7 +338,13 @@ class MultiStoreCrossIndexMixIn:
         crossindex.reset_index(inplace=True)
         crossindex.drop("index", axis=1, inplace=True)
 
-        assert (np.diff(crossindex["master_fn"][~np.isnan(crossindex["master_fn"])]) < 2).all()
+        # assert (np.diff(crossindex["master_fn"][~np.isnan(crossindex["master_fn"])]) < 2).all()
+        # a glitch is a pair of consecutive frames in the master whose frame number does not differ by 1
+        glitches_array = crossindex["master_fn"][~np.isnan(crossindex["master_fn"])] >= 2
+        glitches = np.where(glitches_array)[0]
+        if len(glitches) > 0:
+            warnings.warn(f"{len(glitches)} glitches found in the master feed", stacklevel=2)
+
 
         # drop frames from the selected store that happen before any in the master
         # since they are useless
