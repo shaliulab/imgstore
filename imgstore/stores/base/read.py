@@ -88,10 +88,10 @@ class ReadingStore(abc.ABC):
 
         raise ValueError("No sample rate or dataset found in file")
 
-    def get_extra_data(self, ignore_corrupt_chunks=False):
+    def get_extra_data(self, ignore_corrupt_chunks=False, chunks=None):
         dfs = []
 
-        for is_motif, path in self._iter_extra_data_files():
+        for is_motif, path in self._iter_extra_data_files(chunks=chunks):
 
             self._log.debug('found extra data chunk: %s (motif: %s)' % (path, is_motif))
 

@@ -40,9 +40,12 @@ class ExtraDataMixin:
         self._chunk_md.update(self._metadata)
 
 
-    def _iter_extra_data_files(self, extensions=EXTRA_DATA_FILE_EXTENSIONS):
+    def _iter_extra_data_files(self, chunks=None, extensions=EXTRA_DATA_FILE_EXTENSIONS):
         for chunk_n, chunk_path in self._iter_chunk_n_and_chunk_paths():
             out = None
+
+            if chunks is not None and chunk_n not in chunks:
+                continue
 
             # motif out of process IO puts extra data in the root directory
             for ext in ('.extra_data.h5', '.extra_data.json'):
