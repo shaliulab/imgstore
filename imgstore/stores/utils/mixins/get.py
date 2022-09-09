@@ -1,5 +1,6 @@
 import logging
-
+import os.path
+import numpy as np
 import codetiming
 from imgstore.constants import VERBOSE_DEBUG_CHUNKS
 
@@ -8,7 +9,34 @@ _VERBOSE_DEBUG_GETS = False
 logger = logging.getLogger(__name__)
 
 
-class GetMixin:
+class GetTrajectoryMixin:
+    
+    
+    def get_centroid(self, chunk, frame_idx):
+        centroid = np.load(os.path.join(self._basedir, str(chunk).zfill(6) + ".npy"))[frame_idx]
+        return centroid
+    
+    def get_data(self, frame_number, **kwargs):
+        img, meta = self.get_image(frame_number=frame_number, **kwargs)
+        chunk, frame_idx = self._index.find_chunk("frame_number", frame_number)
+        centroid = self.get_centroid(chunk, frame_idx)
+        meta = list(meta)
+        meta.append(centroid)
+        meta=tuple(meta)
+        return img, meta
+        
+    def get_next_data(self):
+        img, meta = self.get_next_image()
+        frame_number = meta[0]
+        chunk, frame_idx = self._index.find_chunk("frame_number", frame_number)
+        centroid = self.get_centroid(chunk, frame_idx)
+        meta = list(meta)
+        meta.append(centroid)
+        meta=tuple(meta)
+        return img, meta
+
+
+class GetMixin(GetTrajectoryMixin):
 
     def get_next_image(self):
         frame_number, idx = self._get_next_framenumber_and_chunk_frame_idx()
