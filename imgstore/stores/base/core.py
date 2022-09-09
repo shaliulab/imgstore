@@ -8,7 +8,7 @@ import time
 import logging
 import abc
 import numpy as np
-
+import shutil
 from imgstore.constants import DEVNULL, SQLITE3_INDEX_FILE, STORE_MD_FILENAME, STORE_LOCK_FILENAME, STORE_MD_KEY, \
     STORE_INDEX_FILENAME, EXTRA_DATA_FILE_EXTENSIONS, FRAME_MD as _FRAME_MD
 from imgstore.util import ImageCodecProcessor, JsonCustomEncoder, motif_extra_data_h5_to_df, motif_extra_data_json_to_df, motif_extra_data_h5_attrs
@@ -216,6 +216,28 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
             assert self._chunk_current_frame_idx == -1
             assert self._chunk_n == 0
             self.frame_number = np.nan  # we haven't read any frames yet
+
+    def _copy_first_avi_to_mp4_if_needed(self):
+        """
+        Due to a bug, when imgstore encodes using h264_nvenc (CUDA GPU)
+        the first chunk needs to be saved as .avi only,
+        even though the rest of the chunks are saved as .mp4
+        To prevent the indexing algorithm from ignoring this first few frames,
+        we need to copy the .avi to .mp4, pretending it is .mp4  
+        """
+        extension = self._metadata["extension"]
+
+        if extension == ".mp4":
+            avi_file = os.path.join(self._basedir, '%06d%s' % (0, ".avi"))
+            mp4_file = os.path.join(self._basedir, '%06d%s' % (0, ".mp4"))
+            if os.path.exists(
+                avi_file
+            ) and not os.path.exists(
+                mp4_file
+            ):  
+                warnings.warn(f"Copying {avi_file} -> {mp4_file}")
+                shutil.copy(avi_file, mp4_file)
+
 
     @property
     def fps(self):

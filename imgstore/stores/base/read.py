@@ -23,6 +23,8 @@ class ReadingStore(abc.ABC):
         smd = allmd.pop(STORE_MD_KEY)
 
         self._metadata = smd
+        self._copy_first_avi_to_mp4_if_needed()
+
         self._user_metadata.update(allmd)
 
         self._readability_check(smd_class=smd['class'],
