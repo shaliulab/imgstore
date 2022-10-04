@@ -230,10 +230,12 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
         :param frame_index: frame_index (0, frame_count]
         """
 
-        selected_meta, imgs = self.get_images(frame_number, exact_only, frame_index)
+        (selected_frame_number, frame_time), imgs = self.get_images(frame_number, exact_only, frame_index)
         img = self._apply_layout(imgs)
-        self._crossindex_pointer = frame_number
-        return img, selected_meta
+        self._crossindex_pointer = selected_frame_number
+        frame_id = self.crossindex.find_id_given_fn("selected", selected_frame_number)
+        assert frame_id == frame_number
+        return img, (frame_id, frame_time)
 
 
     def get_chunk(self, chunk):
