@@ -232,11 +232,10 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
         :param frame_index: frame_index (0, frame_count]
         """
 
-        (selected_frame_number, frame_time), imgs = self.get_images(frame_number, exact_only, frame_index)
+        (frame_id, frame_time), imgs = self.get_images(frame_number, exact_only, frame_index)
         img = self._apply_layout(imgs)
-        self._crossindex_pointer = selected_frame_number
-        frame_id = self.crossindex.find_id_given_fn("selected", selected_frame_number)
-        assert frame_id == frame_number
+        self._crossindex_pointer = frame_id
+
         return img, (frame_id, frame_time)
 
 
@@ -254,7 +253,6 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
 
     def get_images(self, frame_number, exact_only=True, frame_index=None):
         id=frame_number
-        del frame_number
 
         if _VERBOSE_DEBUG_GETS:
             self._log.debug('get_image %s (exact: %s) frame_idx %s' % (id, exact_only, frame_index))
@@ -269,7 +267,10 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
             selected_fn = self.crossindex.find_fn_given_id("selected", id) 
             imgs[1], selected_meta = self._stores["selected"].get_image(selected_fn)
 
-        return selected_meta, imgs
+        frame_id = self.crossindex.find_id_given_fn("selected", selected_meta[0])
+        assert frame_id == id
+        
+        return (frame_id, selected_meta[1]), imgs
 
 
     @classmethod
