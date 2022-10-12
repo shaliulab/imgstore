@@ -57,6 +57,8 @@ class VideoImgStore(_ImgStore):
         # keep compat with VideoImgStoreFFMPEG
         kwargs.pop('gpu_id', None)
 
+        self._min_bitrate = kwargs.pop("min_bitrate", None)
+        self._max_bitrate = kwargs.pop("max_bitrate", None)
         if kwargs['mode'] == 'w':
             imgshape = kwargs['imgshape']
 
@@ -181,7 +183,9 @@ class VideoImgStore(_ImgStore):
                         fourcc="h264_nvenc",
                         fps=self.fps,
                         frameSize=(w, h),
-                        isColor=self._color
+                        isColor=self._color,
+                        min_bitrate=self._min_bitrate,
+                        max_bitrate=self._max_bitrate
                     )
             
                 else:
