@@ -149,7 +149,7 @@ class VideoCapture():
             return getattr(store, k)
         else:
             try:
-            return getattr(store._stores[store.main], k)
+                return getattr(store._stores[store.main], k)
             except AttributeError:
                 return getattr(store, k)
 
