@@ -77,7 +77,7 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
 
         shape = imgs[0].shape
         shapes = np.vstack([img.shape for img in imgs])
-        max_height, max_width = shapes.max(0)
+        max_height, max_width = shapes[:, :2].max(0)
 
         reshaped_imgs=[]
 
@@ -85,18 +85,20 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
 
             if len(shape) == 3:
                 img = ensure_color(img)
+                color=(255, 255, 255)
             if len(shape) == 2:
                 img = ensure_grayscale(img)
-
+                color=255
 
             if self._config.RESHAPE_METHOD == "resize":
                 reshaped_img = cv2.resize(
                     img,
-                    shape[::-1],
+                    shape[:2][::-1],
                     cv2.INTER_AREA
                 )
 
             elif self._config.RESHAPE_METHOD == "pad":
+
                 reshaped_img = cv2.copyMakeBorder(
                     img,
                     top=0,
@@ -104,7 +106,7 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
                     right=max(0, max_width-img.shape[1]),
                     left=0,
                     borderType=cv2.BORDER_CONSTANT,
-                    value=255
+                    value=color
                 )
 
             reshaped_imgs.append(
