@@ -328,6 +328,7 @@ class VideoImgStore(_ImgStore):
 
         if self._metadata.get("apply_blur", False):
             with codetiming.Timer(text="Applying gaussian blur took {milliseconds:.0f} ms", logger=logger.debug):
+                logger.debug(f"Applying blur {self._metadata['apply_blur']}")
                 img = cv2.GaussianBlur(img, (0, 0), self._metadata["apply_blur"])
 
         with codetiming.Timer(text="Copying image took {milliseconds:.0f} ms", logger=logger.debug):
