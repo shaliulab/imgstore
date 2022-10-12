@@ -148,7 +148,10 @@ class VideoCapture():
         if k in dir(store):
             return getattr(store, k)
         else:
+            try:
             return getattr(store._stores[store.main], k)
+            except AttributeError:
+                return getattr(store, k)
 
 
     def __setstate__(self, d):
