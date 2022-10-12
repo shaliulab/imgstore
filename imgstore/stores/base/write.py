@@ -4,7 +4,7 @@ import datetime
 import pytz
 import tzlocal
 import uuid
-
+import cv2
 import yaml
 import numpy as np
 
@@ -29,6 +29,11 @@ class WritingStore(abc.ABC):
         self._tN = frame_time
 
         self._frame_n += 1
+
+        
+        if self.frame_is_miscoded(self._frame_n):
+            self._save_miscoded_frame(img, self._chunk_n, self.frame_idx)
+            
         if (self._frame_n % self._chunksize) == 0 or (self._frame_n == 10 and self._chunk_n == 0):
             old = self._chunk_n
             new = self._chunk_n + 1
@@ -38,6 +43,15 @@ class WritingStore(abc.ABC):
         self.frame_idx += 1
 
         self.frame_count = self._frame_n
+
+    def _save_miscoded_frame(self, img, chunk, frame_number):
+        path = self._get_miscoded_frame_path(self._basedir, chunk, frame_number)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        cv2.imwrite(path, img)
+        
+    @staticmethod
+    def _get_miscoded_frame_path(basedir, chunk, frame_number):
+        return os.path.join(basedir, "miscoded", str(chunk).zfill(6), str(frame_number).zfill(10) + ".tiff")
 
 
     def _init_write(self, imgshape, imgdtype, chunksize, metadata, encoding, write_encode_encoding, fmt):
@@ -51,8 +65,6 @@ class WritingStore(abc.ABC):
         self._encode_image = self._codec_proc.autoconvert
 
         self._write_imgshape = self._calculate_image_shape(imgshape, fmt)
-        # self._write_imgshape=imgshape
-
 
         if write_encode_encoding:
             # as we always encode to color

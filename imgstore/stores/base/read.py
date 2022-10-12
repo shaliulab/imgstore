@@ -1,14 +1,21 @@
 import abc
+import os.path
+import warnings
 import yaml
 import json
+import logging
 import dateutil.parser
-
+import cv2
+import numpy as np
 import pandas as pd
 
 from imgstore.constants import STORE_MD_KEY, EXTRA_DATA_FILE_EXTENSIONS
 from imgstore.util import motif_extra_data_h5_to_df, motif_extra_data_json_to_df, motif_extra_data_h5_attrs
 from imgstore.stores.utils.datetime import parse_old_time, parse_new_time
 from imgstore.stores.utils.path import get_fullpath
+
+logger = logging.getLogger(__name__)
+
 
 class ReadingStore(abc.ABC):
 
@@ -126,3 +133,20 @@ class ReadingStore(abc.ABC):
                     raise
         if dfs:
             return pd.concat(dfs, axis=0, ignore_index=True)
+
+    def _read_miscoded_frame(self, chunk, frame_number):
+        path = self._get_miscoded_frame_path(self._basedir, chunk, frame_number)
+        if os.path.exists(path):
+            img=cv2.imread(path)
+            ret = type(img) is np.ndarray
+            if ret:
+                print(f"Reading backup for miscoded frame (available in {path})")
+            else:
+                warnings.warn(f"No backup for miscoded frame found (should be in {path}). Using miscoded frame")
+
+            return ret, img
+
+        
+        else:
+            warnings.warn(f"No backup for miscoded frame found (should be in {path}). Using miscoded frame")
+            return False, None

@@ -247,6 +247,18 @@ class VideoImgStore(_ImgStore):
             img = img[:dims[0], :dims[1]].copy(order="C")
         return ret, img               
 
+    def frame_is_miscoded(self, frame_number):
+        return False
+        frame_number_criterion = frame_number % 250 < 2
+        if not frame_number_criterion:
+            return False
+
+        if self._mode == "r":
+            codec_criterion = self._ext == ".mp4"
+        elif self._mode == "w":
+            codec_criterion = self._codec == "h264_nvenc"
+
+        return frame_number_criterion and codec_criterion
 
     def _load_image(self, idx):
         try:
@@ -290,6 +302,12 @@ class VideoImgStore(_ImgStore):
                     #     i += 1
 
                 ret, _img = self._read(cap)
+                if self.frame_is_miscoded(idx):
+                    ret_miscoded, img_miscoded = self._read_miscoded_frame(self._chunk_n, self._chunk_md['frame_number'][idx])
+                    if ret_miscoded:
+                        _img = img_miscoded
+                        ret = ret_miscoded
+
                 if not ret:
                     return None, (None, None)
                 if cap is self._cap_hq:
