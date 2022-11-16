@@ -44,6 +44,7 @@ class VideoCapture():
             
             elif any([path.endswith(ext) for ext in EXTENSIONS["imgstore"]]):
                 cap = imgstore.new_for_filename(path)
+
                 cap.get_chunk(self._chunk)
                 if getattr(self._config, "MULTI_STORE_ENABLED", False):
                     if self._config.SELECTED_STORE:
@@ -149,7 +150,7 @@ class VideoCapture():
             return getattr(store, k)
         else:
             try:
-            return getattr(store._stores[store.main], k)
+                return getattr(store._stores[store.main], k)
             except AttributeError:
                 return getattr(store, k)
 
