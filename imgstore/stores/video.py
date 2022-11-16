@@ -3,6 +3,7 @@ import shutil
 import os.path
 import glob
 import operator
+import tqdm
 import warnings
 
 import codetiming
@@ -25,9 +26,39 @@ ONLY_ALLOW_EVEN_SIDES=True
 
 logger = logging.getLogger(__name__)
 
+def quality_control(metadata, cap):
+    """
+    Verify integrity of file being read
+    """
+
+    diffs = {
+        "height": abs(metadata["imgshape"][0] - cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+        "width": abs(metadata["imgshape"][1] - cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+        "duration": metadata["chunksize"] - cap.get(cv2.CAP_PROP_FRAME_COUNT),
+    }
+
+    for diff in diffs:
+        try:
+            assert diffs[diff] <= 1, f"{diff} is > 1 ({diffs[diff]})"
+        except AssertionError as error:
+            import ipdb; ipdb.set_trace()
+            raise error
+        if diffs[diff] == 1:
+            warnings.warn(f"{diff} difference is 1")
+
+    testing_points = [0.1, 0.5, 0.9]
+    for point in testing_points:
+        pos = int(point * metadata["chunksize"])
+        cap.set(1, pos)
+        assert cap.get(1) == pos
+    
+    cap.set(1, 0)
+    
+
 def find_chunks_video(basedir, ext, chunk_numbers=None):
     if chunk_numbers is None:
         avis = map(os.path.basename, glob.glob(os.path.join(basedir, '*%s' % ext)))
+        avis = [e for e in avis if e.count(".")==1]
         chunk_numbers = list(map(int, map(operator.itemgetter(0), map(os.path.splitext, avis))))
     data = list(zip(chunk_numbers, tuple(os.path.join(basedir, '%06d' % n) for n in chunk_numbers)))
     return data
@@ -109,14 +140,14 @@ class VideoImgStore(_ImgStore):
 
         self._log.info("store is native color: %s (or grayscale with encoding: '%s')" % (self._color, self._encoding))
 
-    def _readability_check(self, smd_class, smd_version):
-        can_read = {'VideoImgStoreFFMPEG', 'VideoImgStore',
-                    getattr(self, 'class_name', self.__class__.__name__)}
-        if smd_class not in can_read:
-            raise ValueError('incompatible store, can_read:%r opened:%r' % (can_read, smd_class))
-        if smd_version != self._version:
-            raise ValueError('incompatible store version')
-        return True
+    # def _readability_check(self, smd_class, smd_version):
+    #     can_read = {'VideoImgStoreFFMPEG', 'VideoImgStore',
+    #                 getattr(self, 'class_name', self.__class__.__name__)}
+    #     if smd_class not in can_read:
+    #         raise ValueError('incompatible store, can_read:%r opened:%r' % (can_read, smd_class))
+    #     if smd_version != self._version:
+    #         raise ValueError('incompatible store version')
+    #     return True
 
     @staticmethod
     def _get_chunk_extension(metadata):
@@ -149,6 +180,10 @@ class VideoImgStore(_ImgStore):
             frame = ensure_color(img)
         else:
             frame = ensure_grayscale(img)
+            
+            
+        if self.in_burnin_period:
+            self._cap_hq.write(frame)
 
         self._cap.write(frame)
         if self._chunk_current_frame_idx > 0 and not os.path.isfile(self._capfn):
@@ -162,6 +197,7 @@ class VideoImgStore(_ImgStore):
         self._save_image_metadata(frame_number, frame_time)
 
     def _save_chunk(self, old, new):
+        print(f"Calling _save_chunk. old={old}, new={new}")
         if self._cap is not None:
             self._cap.release()
             if self._cap_hq is not None: self._cap_hq.release()
@@ -170,13 +206,24 @@ class VideoImgStore(_ImgStore):
         if new is not None:
             fn = os.path.join(self._basedir, '%06d%s' % (new, self._ext))
             h, w = self._imgshape[:2]
+            
+            # if self.burnin_period > 0:
+            self._capfn_hq = fn.replace(".mp4", ".avi")
+            self._cap_hq = cv2.VideoWriter(
+                    filename=self._capfn_hq,
+                    fourcc=cv2.VideoWriter_fourcc(*"DIVX"),
+                    fps=self.fps,
+                    frameSize=(w, h),
+                    isColor=self._color
+                )
             try:
                 
                 if self._codec == "h264_nvenc" and not CV2CUDA_AVAILABLE:
                     self._codec=self._cv2_fmts['avc1/mp4']
 
 
-                if self._codec == "h264_nvenc" and new != 0:
+                if self._codec == "h264_nvenc" and (new != 0 or (old is not None)):
+                    print(f" --> {fn}")
                     self._cap = cv2cuda.VideoWriter(
                         filename=fn,
                         apiPreference="FFMPEG",
@@ -184,8 +231,8 @@ class VideoImgStore(_ImgStore):
                         fps=self.fps,
                         frameSize=(w, h),
                         isColor=self._color,
-                        min_bitrate=self._min_bitrate,
-                        max_bitrate=self._max_bitrate
+                        maxframes=self._chunksize,
+                        **self._metadata["encoder_kwargs"]
                     )
             
                 else:
@@ -230,12 +277,22 @@ class VideoImgStore(_ImgStore):
 
 
     @property
-    def burn_in_period(self):
-        pass
-        if self._capfn.endswith(".mp4") and os.path.exists(self._capfn_hq) and self._cap_hq is not None:
-            return self.fps * 5
+    def burnin_period(self):
+        if self._ext == ".mp4" and os.path.exists(self._capfn_hq) and self._cap_hq is not None:
+            if self._metadata.get("burnin_period", 2)  == 0:
+                period = 0 # s
+            else:
+                period = 2
+            return self.fps * period
         else:
             return -1
+        
+        
+    @property
+    def in_burnin_period(self):
+        in_burnin_period_status=self.frame_idx < self.burnin_period
+        return in_burnin_period_status
+    
 
     @staticmethod
     def _read(cap):
@@ -271,10 +328,8 @@ class VideoImgStore(_ImgStore):
         except:
             message = "no-debug"
 
-
         with codetiming.Timer(text="Reading image took {milliseconds:.0f} ms", logger=logger.debug):
-
-            if idx < self.burn_in_period:
+            if (idx+1) < self.burnin_period:
                 cap  = self._cap_hq
                 if message == "debug": print("Loading from high quality capture")
             else:
@@ -306,6 +361,18 @@ class VideoImgStore(_ImgStore):
                     #     i += 1
 
                 ret, _img = self._read(cap)
+                if not ret and idx < cap.get(7):
+                    warnings.warn("Weird behavior of VideoCapture object. Resetting")
+                    cap.set(1, 0)
+                    for _ in tqdm.tqdm(range(idx)):
+                        ret, _  = cap.read()
+                        assert ret
+                    # del cap
+                    # cap = cv2.VideoCapture(self._capfn)
+                    # cap.set(getattr(cv2, "CAP_PROP_POS_FRAMES", 1), idx)
+                    # self._cap = cap
+                    ret, _img = self._read(cap)
+
                 if self.frame_is_miscoded(idx):
                     ret_miscoded, img_miscoded = self._read_miscoded_frame(self._chunk_n, self._chunk_md['frame_number'][idx])
                     if ret_miscoded:
@@ -354,6 +421,8 @@ class VideoImgStore(_ImgStore):
                 self._cap = cv2.VideoCapture(self._capfn)
                 caps.append(self._cap)
                 fns.append(self._capfn)
+                if n > 1:
+                    quality_control(self._metadata, self._cap)
 
             self._capfn_hq = os.path.splitext(fn)[0] + ".avi"
             self._cap_hq = cv2.VideoCapture(self._capfn_hq)
@@ -415,7 +484,7 @@ class VideoImgStore(_ImgStore):
             self._capfn = None
         if self._cap_hq is not None:
             self._cap_hq.release()
-            self._cap_fn = None
+            self._capfn = None
 
     def empty(self):
         _ImgStore.empty(self)

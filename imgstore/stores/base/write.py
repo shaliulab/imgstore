@@ -10,6 +10,69 @@ import numpy as np
 
 from imgstore.constants import STORE_MD_FILENAME, STORE_LOCK_FILENAME, STORE_MD_KEY, STORE_INDEX_FILENAME
 
+
+def annotate_frame(frame, metadata):
+    
+    FONT = cv2.FONT_HERSHEY_SIMPLEX
+    FONT_SCALE = 0.5
+    FONT_THICKNESS = 2
+    if len(frame.shape) == 2:
+        n_channels = 1
+    else:
+        n_channels = frame.shape[2]
+
+    bg_color = (255, ) * n_channels
+    label_color = (0, ) * n_channels
+
+    label = "\n".join([f"{k}: {v}" for k, v in metadata.items()])
+    
+    (label_width, label_height), baseline = cv2.getTextSize(label, FONT, FONT_SCALE, FONT_THICKNESS)
+    if n_channels != 1:
+        label_patch = np.zeros((label_height + baseline, label_width, n_channels), np.uint8)
+    else:
+        label_patch = np.zeros((label_height + baseline, label_width), np.uint8)
+        
+    label_patch[:,:] = bg_color
+    cv2.putText(label_patch, label, (0, label_height), FONT, FONT_SCALE, label_color, FONT_THICKNESS)
+    
+    if n_channels != 1:
+        frame[:(label_height+baseline), :label_width, :] = label_patch
+    else:
+        frame[:(label_height+baseline), :label_width] = label_patch
+    return frame
+
+alpha=7
+beta=20
+gamma=4
+
+lookUpTable = np.empty((1,256), np.uint8)
+for i in range(256):
+    lookUpTable[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
+
+alpha=10
+beta=10
+gamma=10
+lookUpTable = np.empty((1,256), np.uint8)
+for i in range(256):
+    lookUpTable[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
+
+kernel=np.ones((3, 3))
+ratio=25
+zero=20
+bias=22
+
+def process_image(img, threshold=None):
+    # img = cv2.imread("/Users/Antonio/FSLLab/Projects/FlyHostel4/notebooks/2022-10-23_contrast/18518318-2022-10-23-213232.png", cv2.IMREAD_GRAYSCALE)
+    new_image = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
+    res = cv2.LUT(new_image, lookUpTable)
+    blur=cv2.GaussianBlur(res,(5, 5), 1)
+
+    # _, thr = cv2.threshold(blur, threshold, 255, cv2.THRESH_BINARY_INV)
+    # close = cv2.morphologyEx(thr, cv2.MORPH_CLOSE, kernel)
+    # erosion = 255-cv2.erode(close, kernel, 2)
+    out = blur
+    return out
+
 class WritingStore(abc.ABC):
 
 
@@ -17,6 +80,18 @@ class WritingStore(abc.ABC):
 
         if img.shape != self._write_imgshape:
             img = img[:self._write_imgshape[0], :self._write_imgshape[1]].copy(order="C")
+
+        # if "lowres" in self._basedir:
+        #     # mean = img.mean()
+        #     # print(mean)
+        #     # threshold=bias+(ratio*(mean-zero))
+
+        #     # print(threshold)
+        #     img = process_image(img, threshold=None)
+
+
+        img = annotate_frame(img, metadata={"fn": self.frame_idx-1})
+
         self._save_image(self._encode_image(img), frame_number, frame_time)
 
         self.frame_max = np.nanmax((frame_number, self.frame_max))
@@ -34,9 +109,17 @@ class WritingStore(abc.ABC):
         if self.frame_is_miscoded(self._frame_n):
             self._save_miscoded_frame(img, self._chunk_n, self.frame_idx)
             
-        if (self._frame_n % self._chunksize) == 0 or (self._frame_n == 10 and self._chunk_n == 0):
+        if (self._frame_n % self._chunksize) == 0 or (self._frame_n == 1 and self._chunk_n == 0 and not self._already_init):
             old = self._chunk_n
-            new = self._chunk_n + 1
+            if self._chunk_n == 0 and not self._already_init:
+                self._already_init = True
+                self._frame_n = 0
+                self._t0 = frame_time
+                new = 0
+
+            else:
+                new = self._chunk_n + 1
+            print(self._frame_n)
             self._save_chunk(old, new)
             self._chunk_n = new
 
@@ -61,6 +144,7 @@ class WritingStore(abc.ABC):
                     raise ValueError('unsupported store image encoding: %s' % e)
 
         # if encoding is unset, autoconvert is no-op
+        print(f"write_encode_encoding: {write_encode_encoding}")
         self._codec_proc.set_default_code(write_encode_encoding)
         self._encode_image = self._codec_proc.autoconvert
 

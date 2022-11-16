@@ -87,6 +87,7 @@ class CV2Mixin:
 
         if absolute:
             return self.frame_number+1
+            # return self._get_chunk_metadata(self._chunk_n)["frame_number"][0]+1
         else:
             frame_number_0 = self._get_chunk_metadata(self._chunk_n)["frame_number"][0]
             posframes = self.frame_number - frame_number_0+1

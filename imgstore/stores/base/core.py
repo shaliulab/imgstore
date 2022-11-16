@@ -124,7 +124,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
 
     # noinspection PyShadowingBuiltins
     def __init__(self, basedir, mode, fps=25, imgshape=None, imgdtype=np.uint8, chunksize=None, metadata=None,
-                 encoding=None, write_encode_encoding=None, format=None, index=None, **kwargs):
+                 encoding=None, write_encode_encoding=None, format=None, index=None, encoder_kwargs={}, **kwargs):
         if mode not in self._supported_modes:
             raise ValueError('mode not supported')
 
@@ -145,10 +145,11 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         self._encode_image = None
         self._uuid = None
 
-        self._metadata = {"framerate": fps, **kwargs}
+        self._metadata = {"framerate": fps, **kwargs, "encoder_kwargs": encoder_kwargs}
         self._user_metadata = {}
         self._frame_metadata = {}
         self._write_imgshape = ()
+        self._already_init = False
 
         self._tN = self._t0 = time.time()
 
@@ -212,7 +213,15 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
             self.frame_max = self._index.frame_max
 
             # reset to the start of the file and load the first chunk
-            self._load_chunk(0)
+            try:
+                self._load_chunk(0)
+            except Exception as error:
+                warnings.warn("Chunk 0 not found")
+                try:
+                    self._load_chunk(1)
+                except:
+                    raise error
+
             assert self._chunk_current_frame_idx == -1
             assert self._chunk_n == 0
             self.frame_number = np.nan  # we haven't read any frames yet
@@ -259,7 +268,11 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         """
         self._log.debug(f"{self}.get_chunk({chunk})")
         assert chunk is not None
-        first_fn=self._index.get_chunk_metadata(chunk)["frame_number"][0]
+        try:
+            first_fn=self._index.get_chunk_metadata(chunk)["frame_number"][0]
+        except Exception as error:
+            print(f"Cannot find first frame of chunk {chunk}")
+            raise error
         img, (frame_number, frame_time) = self.get_image(max(0, first_fn))
         return img, (frame_number, frame_time)
     

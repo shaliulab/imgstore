@@ -1,3 +1,4 @@
+import warnings
 import logging
 import os.path
 import numpy as np
@@ -67,12 +68,18 @@ class GetMixin(GetTrajectoryMixin):
         :param exact_only: If False return the nearest frame
         :param frame_index: frame_index (0, frame_count]
         """
+        # import ipdb; ipdb.set_trace()
         if _VERBOSE_DEBUG_GETS:
             self._log.debug('get_image %s (exact: %s) frame_idx %s' % (frame_number, exact_only, frame_index))
         if frame_index is not None:
             return self._get_image_by_frame_index(frame_index)
         else:
-            return self._get_image_by_frame_number(frame_number, exact_only=exact_only)
+            if (self.frame_number + 1) == frame_number:
+                return self.get_next_image()
+            elif self.frame_number == frame_number:
+                return self._last_img.copy(), (self.frame_number, self.frame_time)
+            else:
+                return self._get_image_by_frame_number(frame_number, exact_only=exact_only)
 
 
     def _get_next_framenumber_and_chunk_frame_idx(self):
@@ -104,6 +111,9 @@ class GetMixin(GetTrajectoryMixin):
         # ensure the read works before setting frame_number
         with codetiming.Timer(text="Loading image took {milliseconds:.0f} ms", logger=logger.debug):
             _img, (_frame_number, _frame_timestamp) = self._load_image(frame_idx)
+            if _img is None:
+                warnings.warn(f"Cannot read frame_idx {frame_idx}. Skipping to chunk {self._chunk_n+1}")
+                return self._get_image(self._chunk_n+1, 0)
         with codetiming.Timer(text="Decoding image took {milliseconds:.0f} ms", logger=logger.debug):
             img = self._decode_image(_img)
         self._chunk_current_frame_idx = frame_idx

@@ -74,7 +74,7 @@ class ReadingStore(abc.ABC):
         if smd_class != class_name:
             raise ValueError('incompatible store, can_read:%r opened:%r' % (class_name, smd_class))
         if smd_version != self._version:
-            raise ValueError('incompatible store version')
+            raise ValueError(f'incompatible store version')
         return True
 
 
