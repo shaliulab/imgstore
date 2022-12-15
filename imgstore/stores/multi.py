@@ -16,7 +16,7 @@ from imgstore.stores.utils.mixins.extract import _extract_store_metadata
 from imgstore.stores.core import new_for_filename as new_for_filename_single
 from imgstore.stores.utils.mixins import ContextManagerMixin
 from imgstore.stores.utils.mixins.multi import MultiStoreCrossIndexMixIn
-from confapp import conf, load_config
+from confapp import conf
 from imgstore.util import ensure_color, ensure_grayscale
 from imgstore import constants
 
@@ -29,7 +29,7 @@ class VideoImgStore(ContextManagerMixin, MultiStoreCrossIndexMixIn):
     def __init__(self, main_, secondary_, **stores):
         
 
-        self._config = load_config(constants)
+        self._config = conf.__dict__
         self._crossindex=None
         self.main=main_
         self.secondary=secondary_

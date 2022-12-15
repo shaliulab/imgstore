@@ -5,7 +5,7 @@ import logging
 
 EXTENSIONS={"imgstore": [".yaml", ".yml"], "video": [".mp4", ".avi"]}
 import imgstore.constants
-from confapp import conf, load_config
+from confapp import conf
 import cv2
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ class VideoCapture():
 
     def __init__(self, path, chunk=None):
         import imgstore.constants
-        self._config = load_config(imgstore.constants)
+        self._config = conf.__dict__
 
         MULTI_STORE_ENABLED=getattr(self._config, "MULTI_STORE_ENABLED", False)
         if MULTI_STORE_ENABLED:
