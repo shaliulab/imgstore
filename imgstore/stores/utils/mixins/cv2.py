@@ -2,10 +2,8 @@ import logging
 import traceback
 import cv2
 import numpy as np
-from confapp import conf, load_config
 logger = logging.getLogger(__name__)
 from imgstore import constants
-config = load_config(constants)
 
 class CV2Mixin:
     """
@@ -24,7 +22,7 @@ class CV2Mixin:
 
             if isinstance(img, np.ndarray):
                 ret = True
-                if getattr(config, "COLOR", False) and len(img.shape) == 2:
+                if conf.COLOR and len(img.shape) == 2:
                     logger.debug(f"Converting grayscale image of shape {img.shape} to BGR")
                     img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
