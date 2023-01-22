@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 logger = logging.getLogger(__name__)
 from imgstore import constants
+from confapp import conf
 
 class CV2Mixin:
     """
