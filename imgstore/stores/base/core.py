@@ -124,7 +124,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
 
     # noinspection PyShadowingBuiltins
     def __init__(self, basedir, mode, fps=25, imgshape=None, imgdtype=np.uint8, chunksize=None, metadata=None,
-                 encoding=None, write_encode_encoding=None, format=None, index=None, encoder_kwargs={}, **kwargs):
+                 encoding=None, write_encode_encoding=None, format=None, index=None, encoder_kwargs={}, first_chunk=0, **kwargs):
         if mode not in self._supported_modes:
             raise ValueError('mode not supported')
 
@@ -167,8 +167,10 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         if _VERBOSE_VERY:
             _VERBOSE_DEBUG_GETS = VERBOSE_DEBUG_CHUNKS = True
             self._log = _Log
-
-        self._chunk_n = 0
+            
+            
+        self._first_chunk=first_chunk
+        self._chunk_n = self._first_chunk
         self._chunk_current_frame_idx = -1
         self._chunk_n_and_chunk_paths = None
         self._last_img = None
@@ -214,16 +216,13 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
 
             # reset to the start of the file and load the first chunk
             try:
-                self._load_chunk(0)
+                self._load_chunk(self._first_chunk)
             except Exception as error:
-                warnings.warn("Chunk 0 not found")
-                try:
-                    self._load_chunk(1)
-                except:
-                    raise error
+                warnings.warn(f"Chunk {self._first_chunk} not found")
+                raise error
 
             assert self._chunk_current_frame_idx == -1
-            assert self._chunk_n == 0
+            assert self._chunk_n == self._first_chunk
             self.frame_number = np.nan  # we haven't read any frames yet
 
     def _copy_first_avi_to_mp4_if_needed(self):
@@ -356,7 +355,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         self.frame_count = 0
         self.frame_time = np.nan
 
-        self._chunk_n = 0
+        self._chunk_n = self._first_chunk
         self._chunk_n_and_chunk_paths = None
 
         if self._extra_data_fp is not None:
