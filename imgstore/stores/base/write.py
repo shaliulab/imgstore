@@ -76,7 +76,7 @@ def process_image(img, threshold=None):
 class WritingStore(abc.ABC):
 
 
-    def add_image(self, img, frame_number, frame_time):
+    def add_image(self, img, frame_number, frame_time, annotate=True):
 
         if img.shape != self._write_imgshape:
             img = img[:self._write_imgshape[0], :self._write_imgshape[1]].copy(order="C")
@@ -90,7 +90,8 @@ class WritingStore(abc.ABC):
         #     img = process_image(img, threshold=None)
 
 
-        img = annotate_frame(img, metadata={"fn": self.frame_idx-1})
+        if annotate:
+            img = annotate_frame(img, metadata={"fn": self.frame_idx-1})
 
         self._save_image(self._encode_image(img), frame_number, frame_time)
 
