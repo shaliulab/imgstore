@@ -113,6 +113,7 @@ class WritingStore(abc.ABC):
 
         if (self._frame_n % self._chunksize) > 0.9 * self._chunksize and self._step1:
             old = self._chunk_n
+            new = self._chunk_n + 1
             self._step1=False
             self._start_chunk(old, new)
             
