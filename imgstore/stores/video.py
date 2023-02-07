@@ -291,6 +291,12 @@ class VideoImgStore(_ImgStore):
 
         if new is not None:
             self._start_chunk(old, new)
+
+            self._capfn = self._capfn_
+            self._capfn_hq = self._capfn_hq_
+            self._cap = self._cap_
+            self._cap_hq = self._cap_hq_
+
             self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
             self.frame_idx = 0
 
