@@ -196,85 +196,102 @@ class VideoImgStore(_ImgStore):
 
         self._save_image_metadata(frame_number, frame_time)
 
-    def _save_chunk(self, old, new):
-        print(f"Calling _save_chunk. old={old}, new={new}")
+
+
+    def _finish_chunk(self, old):
         if self._cap is not None:
             self._cap.release()
             if self._cap_hq is not None: self._cap_hq.release()
             self._save_chunk_metadata(os.path.join(self._basedir, '%06d' % old))
 
-        if new is not None:
-            fn = os.path.join(self._basedir, '%06d%s' % (new, self._ext))
-            h, w = self._imgshape[:2]
+    def _start_chunk(self, old, new):
+        """
+        Update
+
+        self._capfn
+        self._cap
+
+        self._capfn_hq
+        self._cap_hq
+        """
+        fn = os.path.join(self._basedir, '%06d%s' % (new, self._ext))
+        h, w = self._imgshape[:2]
+        
+        # if self.burnin_period > 0:
+        self._capfn_ = fn
+        self._capfn_hq_ = self._capfn_.replace(".mp4", ".avi")
+        self._cap_hq_ = cv2.VideoWriter(
+                filename=self._capfn_hq_,
+                fourcc=cv2.VideoWriter_fourcc(*"DIVX"),
+                fps=self.fps,
+                frameSize=(w, h),
+                isColor=self._color
+            )
+        try:
             
-            # if self.burnin_period > 0:
-            self._capfn_hq = fn.replace(".mp4", ".avi")
-            self._cap_hq = cv2.VideoWriter(
-                    filename=self._capfn_hq,
-                    fourcc=cv2.VideoWriter_fourcc(*"DIVX"),
+            if self._codec == "h264_nvenc" and not CV2CUDA_AVAILABLE:
+                self._codec=self._cv2_fmts['avc1/mp4']
+
+
+            if self._codec == "h264_nvenc" and (new != 0 or (old is not None)):
+                print(f" --> {fn}")
+                self._cap_ = cv2cuda.VideoWriter(
+                    filename=self._capfn_,
+                    apiPreference="FFMPEG",
+                    fourcc="h264_nvenc",
                     fps=self.fps,
                     frameSize=(w, h),
-                    isColor=self._color
+                    isColor=self._color,
+                    maxframes=self._chunksize,
+                    **self._metadata["encoder_kwargs"]
                 )
-            try:
-                
-                if self._codec == "h264_nvenc" and not CV2CUDA_AVAILABLE:
-                    self._codec=self._cv2_fmts['avc1/mp4']
-
-
-                if self._codec == "h264_nvenc" and (new != 0 or (old is not None)):
-                    print(f" --> {fn}")
-                    self._cap = cv2cuda.VideoWriter(
-                        filename=fn,
-                        apiPreference="FFMPEG",
-                        fourcc="h264_nvenc",
-                        fps=self.fps,
-                        frameSize=(w, h),
-                        isColor=self._color,
-                        maxframes=self._chunksize,
-                        **self._metadata["encoder_kwargs"]
-                    )
-            
+        
+            else:
+                if new == 0 and self._codec == "h264_nvenc":
+                    codec = cv2.VideoWriter_fourcc(*"DIVX")
+                    filename = self._capfn_.replace(".mp4", ".avi")
                 else:
-                    if new == 0 and self._codec == "h264_nvenc":
-                        codec = cv2.VideoWriter_fourcc(*"DIVX")
-                        filename = fn.replace(".mp4", ".avi")
-                    else:
-                        codec = self._codec
-                        filename = fn
+                    codec = self._codec
+                    filename = self._capfn_
 
-                    self._cap = cv2.VideoWriter(
-                        filename=filename,
-                        apiPreference=cv2.CAP_FFMPEG,
-                        fourcc=codec,
-                        fps=self.fps,
-                        frameSize=(w, h),
-                        isColor=self._color
-                    )
-
-            except TypeError as error:
-                self._log.error(
-                    f"""
-                    {error}
-                    old (< 3.2) cv2 not supported (this is {cv2.__version__})
-                    filename: {fn},
-                    fourcc: {self._codec},
-                    frameSize: {(w, h)},
-                    isColor: {self._color}
-                    """
-                )
-                self._cap = cv2.VideoWriter(
-                    filename=fn,
-                    fourcc=self._codec,
+                self._cap_ = cv2.VideoWriter(
+                    filename=filename,
+                    apiPreference=cv2.CAP_FFMPEG,
+                    fourcc=codec,
                     fps=self.fps,
                     frameSize=(w, h),
                     isColor=self._color
                 )
 
-            self._capfn = fn
+        except TypeError as error:
+            self._log.error(
+                f"""
+                {error}
+                old (< 3.2) cv2 not supported (this is {cv2.__version__})
+                filename: {fn},
+                fourcc: {self._codec},
+                frameSize: {(w, h)},
+                isColor: {self._color}
+                """
+            )
+            self._cap_ = cv2.VideoWriter(
+                filename=self._capfn_,
+                fourcc=self._codec,
+                fps=self.fps,
+                frameSize=(w, h),
+                isColor=self._color
+            )
+
+
+
+    def _save_chunk(self, old, new):
+        print(f"Calling _save_chunk. old={old}, new={new}")
+        self._finish_chunk(old)
+
+        if new is not None:
+            self._start_chunk(old, new)
             self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
             self.frame_idx = 0
-
 
     @property
     def burnin_period(self):
