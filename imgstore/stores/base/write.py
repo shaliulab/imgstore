@@ -109,6 +109,11 @@ class WritingStore(abc.ABC):
         
         if self.frame_is_miscoded(self._frame_n):
             self._save_miscoded_frame(img, self._chunk_n, self.frame_idx)
+
+
+        if (self._frame_n % self._chunksize) > 0.9 * self._chunksize and self._step1:
+            self._step1=False
+            self._start_chunk(old, new)
             
         if (self._frame_n % self._chunksize) == 0 or (self._frame_n == 1 and self._chunk_n == 0 and not self._already_init):
             old = self._chunk_n
@@ -121,7 +126,14 @@ class WritingStore(abc.ABC):
             else:
                 new = self._chunk_n + 1
             print(self._frame_n)
-            self._save_chunk(old, new)
+            self._finish_chunk(old)
+            self._step1=True
+            self._capfn = self._capfn_
+            self._capfn_hq = self._capfn_hq_
+            self._cap = self._cap_
+            self._cap_hq = self._cap_hq_
+            self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
+            self.frame_idx = 0
             self._chunk_n = new
 
         self.frame_idx += 1
