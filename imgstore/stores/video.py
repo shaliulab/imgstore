@@ -181,8 +181,9 @@ class VideoImgStore(_ImgStore):
         else:
             frame = ensure_grayscale(img)
             
-            
+        # print(self.frame_idx, self.burnin_period) 
         if self.in_burnin_period:
+            # print(f"Writing frame {frame.shape} in burn in period {self.burnin_period}")
             self._cap_hq.write(frame)
 
         self._cap.write(frame)
