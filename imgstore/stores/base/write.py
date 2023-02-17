@@ -76,7 +76,7 @@ def process_image(img, threshold=None):
 class WritingStore(abc.ABC):
 
 
-    def add_image(self, img, frame_number, frame_time, annotate=True):
+    def add_image(self, img, frame_number, frame_time, annotate=True, start_next_chunk=True):
 
         if img.shape != self._write_imgshape:
             img = img[:self._write_imgshape[0], :self._write_imgshape[1]].copy(order="C")
@@ -89,6 +89,7 @@ class WritingStore(abc.ABC):
         #     # print(threshold)
         #     img = process_image(img, threshold=None)
 
+        new_fn = None
 
         if annotate:
             img = annotate_frame(img, metadata={"fn": self.frame_idx-1})
@@ -121,12 +122,14 @@ class WritingStore(abc.ABC):
             else:
                 new = self._chunk_n + 1
             print(self._frame_n)
-            self._save_chunk(old, new)
-            self._chunk_n = new
+
+            if not start_next_chunk:
+                new = None
+            new_fn = self._save_chunk(old, new)
 
         self.frame_idx += 1
-
         self.frame_count = self._frame_n
+        return new_fn 
 
     def _save_miscoded_frame(self, img, chunk, frame_number):
         path = self._get_miscoded_frame_path(self._basedir, chunk, frame_number)

@@ -323,7 +323,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
 
 
     def close(self, save_index=False):
-        if self._mode in 'wa':
+        if self._mode in 'wa' and self._chunk_n is not None:
             self._save_chunk(self._chunk_n, None)
             # noinspection PyBroadException
             try:

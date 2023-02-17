@@ -274,6 +274,7 @@ class VideoImgStore(_ImgStore):
             self._capfn = fn
             self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
             self.frame_idx = 0
+            return fn
 
 
     @property
