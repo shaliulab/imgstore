@@ -161,6 +161,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         self.frame_count = 0
         self.frame_time = np.nan
         self.is_multistore = False
+        self._step1=True
 
 
         self._log = logging.getLogger('imgstore')
