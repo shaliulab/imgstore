@@ -244,8 +244,7 @@ class WritingStore(abc.ABC):
 
     def _save_chunk_metadata(self, path_without_extension, extension='.npz'):
         path = path_without_extension + extension
-        print("Length of frame_time", len(self._chunk_md["frame_time"]))
-
+        # print("Length of frame_time", len(self._chunk_md["frame_time"]))
         self._save_index(path, self._chunk_md)
 
         # also calculate the filename of the extra file to hold any data
