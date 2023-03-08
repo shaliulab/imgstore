@@ -51,9 +51,9 @@ def quality_control(metadata, cap):
         pos = int(point * metadata["chunksize"])
         cap.set(1, pos)
         assert cap.get(1) == pos
-    
+
     cap.set(1, 0)
-    
+
 
 def find_chunks_video(basedir, ext, chunk_numbers=None):
     if chunk_numbers is None:
@@ -109,7 +109,7 @@ class VideoImgStore(_ImgStore):
             except Exception as error:
                 warnings.warn(f"{fmt} is not splittable", stacklevel=2)
                 raise error
-                
+
             kwargs['metadata'] = metadata
             kwargs['encoding'] = kwargs.pop('encoding', None)
 
@@ -175,13 +175,13 @@ class VideoImgStore(_ImgStore):
 
     def _save_image(self, img, frame_number, frame_time):
         # we always write color because its more supported
-            
+
         if self._color:
             frame = ensure_color(img)
         else:
             frame = ensure_grayscale(img)
-            
-        # print(self.frame_idx, self.burnin_period) 
+
+        # print(self.frame_idx, self.burnin_period)
         if self.in_burnin_period:
             # print(f"Writing frame {frame.shape} in burn in period {self.burnin_period}")
             self._cap_hq.write(frame)
@@ -203,7 +203,9 @@ class VideoImgStore(_ImgStore):
         if self._cap is not None:
             self._cap.release()
             if self._cap_hq is not None: self._cap_hq.release()
-            self._save_chunk_metadata(os.path.join(self._basedir, '%06d' % old))
+            filename=os.path.join(self._basedir, '%06d' % old)
+            print("SAVE CHUNK METADATA", filename)
+            self._save_chunk_metadata(filename)
 
     def _start_chunk(self, old, new):
         """
@@ -217,7 +219,7 @@ class VideoImgStore(_ImgStore):
         """
         fn = os.path.join(self._basedir, '%06d%s' % (new, self._ext))
         h, w = self._imgshape[:2]
-        
+
         # if self.burnin_period > 0:
         self._capfn_ = fn
         self._capfn_hq_ = self._capfn_.replace(".mp4", ".avi")
@@ -229,7 +231,7 @@ class VideoImgStore(_ImgStore):
                 isColor=self._color
             )
         try:
-            
+
             if self._codec == "h264_nvenc" and not CV2CUDA_AVAILABLE:
                 self._codec=self._cv2_fmts['avc1/mp4']
 
@@ -246,7 +248,7 @@ class VideoImgStore(_ImgStore):
                     maxframes=self._chunksize,
                     **self._metadata["encoder_kwargs"]
                 )
-        
+
             else:
                 if new == 0 and self._codec == "h264_nvenc":
                     codec = cv2.VideoWriter_fourcc(*"DIVX")
@@ -299,7 +301,7 @@ class VideoImgStore(_ImgStore):
 
             self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
             self.frame_idx = 0
-            return fn
+            return self._capfn
 
     @property
     def burnin_period(self):
@@ -311,13 +313,13 @@ class VideoImgStore(_ImgStore):
             return self.fps * period
         else:
             return -1
-        
-        
+
+
     @property
     def in_burnin_period(self):
         in_burnin_period_status=self.frame_idx < self.burnin_period
         return in_burnin_period_status
-    
+
 
     @staticmethod
     def _read(cap):
@@ -329,9 +331,9 @@ class VideoImgStore(_ImgStore):
             for i, dimension in enumerate(img.shape):
                 if dimension % 2 != 0:
                     dims[i] -= 1
-            
+
             img = img[:dims[0], :dims[1]].copy(order="C")
-        return ret, img               
+        return ret, img
 
     def frame_is_miscoded(self, frame_number):
         return False
@@ -376,7 +378,7 @@ class VideoImgStore(_ImgStore):
                     raise Exception("Only videos with seeking support enabled")
                     # TODO
                     # Return back support for videos without seeking
-                    # support by dealing here both with _cap and _cap_hq 
+                    # support by dealing here both with _cap and _cap_hq
                     # if idx <= self._chunk_current_frame_idx:
                     #     self._load_chunk(self._chunk_n, _force=True)
 

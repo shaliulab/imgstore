@@ -12,7 +12,18 @@ from imgstore.constants import STORE_MD_FILENAME, STORE_LOCK_FILENAME, STORE_MD_
 
 
 def annotate_frame(frame, metadata):
-    
+    """Write an annotation on the top left corner of the frame
+
+    Args:
+        frame (np.ndarray): Recording image
+        metadata (dict): Information to be written to the frame
+
+    Returns:
+        frame (np.ndarray): Recording image with white box in the top left corner with information written to it
+
+    The information written now is all items in the metadata line by line with format "key: value\n"
+    """
+
     FONT = cv2.FONT_HERSHEY_SIMPLEX
     FONT_SCALE = 0.5
     FONT_THICKNESS = 2
@@ -25,16 +36,16 @@ def annotate_frame(frame, metadata):
     label_color = (0, ) * n_channels
 
     label = "\n".join([f"{k}: {v}" for k, v in metadata.items()])
-    
+
     (label_width, label_height), baseline = cv2.getTextSize(label, FONT, FONT_SCALE, FONT_THICKNESS)
     if n_channels != 1:
         label_patch = np.zeros((label_height + baseline, label_width, n_channels), np.uint8)
     else:
         label_patch = np.zeros((label_height + baseline, label_width), np.uint8)
-        
+
     label_patch[:,:] = bg_color
     cv2.putText(label_patch, label, (0, label_height), FONT, FONT_SCALE, label_color, FONT_THICKNESS)
-    
+
     if n_channels != 1:
         frame[:(label_height+baseline), :label_width, :] = label_patch
     else:
@@ -77,19 +88,23 @@ class WritingStore(abc.ABC):
 
 
     def add_image(self, img, frame_number, frame_time, annotate=True, start_next_chunk=True):
+        """Extend imgstore recording
+
+        Args:
+            img (np.ndarray): Raw frame delivered by the camera
+            frame_number (int): Increasing count of frames, so this number is the number of frames already added + 1
+            frame_time (int): The time in ms when the frame was collected relative to the first one
+            annotate (bool, optional): . Defaults to True, whether to write metadata to the top left corner of the frame
+            start_next_chunk (bool, optional): _description_. Defaults to True. Whether the next chunk should be initialized if the current frame is the last frame of the chunk
+
+        Returns:
+            _type_: _description_
+        """
 
         if img.shape != self._write_imgshape:
             img = img[:self._write_imgshape[0], :self._write_imgshape[1]].copy(order="C")
 
-        # if "lowres" in self._basedir:
-        #     # mean = img.mean()
-        #     # print(mean)
-        #     # threshold=bias+(ratio*(mean-zero))
-
-        #     # print(threshold)
-        #     img = process_image(img, threshold=None)
-
-        new_fn = None
+        new_capfn = None
 
         if annotate:
             img = annotate_frame(img, metadata={"fn": self.frame_idx-1})
@@ -100,24 +115,25 @@ class WritingStore(abc.ABC):
         self.frame_min = np.nanmin((frame_number, self.frame_min))
         self.frame_number = frame_number
         self.frame_time = frame_time
-
         if self._frame_n == 0:
             self._t0 = frame_time
         self._tN = frame_time
-
         self._frame_n += 1
 
-        
+
         if self.frame_is_miscoded(self._frame_n):
             self._save_miscoded_frame(img, self._chunk_n, self.frame_idx)
 
 
-        if (self._frame_n % self._chunksize) > 0.9 * self._chunksize and self._step1:
+        # this is true only if the chunk is almost finished and
+        if (self._frame_n % self._chunksize) > 0.9 * self._chunksize and self._previous_chunk_is_finished_and_next_not_yet_started:
             old = self._chunk_n
             new = self._chunk_n + 1
-            self._step1=False
+            self._previous_chunk_is_finished_and_next_not_yet_started=False
             self._start_chunk(old, new)
-            
+
+
+        # this is true only if the chunk is finished or we are at the beginning of the first chunk
         if (self._frame_n % self._chunksize) == 0 or (self._frame_n == 1 and self._chunk_n == 0 and not self._already_init):
             old = self._chunk_n
             if self._chunk_n == 0 and not self._already_init:
@@ -129,31 +145,31 @@ class WritingStore(abc.ABC):
             else:
                 new = self._chunk_n + 1
 
-            print(self._frame_n)
+            if start_next_chunk:
+                self._finish_chunk(old)
+                self._previous_chunk_is_finished_and_next_not_yet_started=True
+                self._capfn = self._capfn_
+                self._capfn_hq = self._capfn_hq_
+                self._cap = self._cap_
+                self._cap_hq = self._cap_hq_
+                self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
+                self.frame_idx = 0
+                self._chunk_n = new
+                new_capfn = self._capfn
 
-            #self._finish_chunk(old)
-            #self._step1=True
-            #self._capfn = self._capfn_
-            #self._capfn_hq = self._capfn_hq_
-            #self._cap = self._cap_
-            #self._cap_hq = self._cap_hq_
-            #self._new_chunk_metadata(os.path.join(self._basedir, '%06d' % new))
-            #self.frame_idx = 0
-            #self._chunk_n = new
-
-            if not start_next_chunk:
+            else:
                 new = None
-            new_fn = self._save_chunk(old, new)
+                new_capfn = self._save_chunk(old, new)
 
         self.frame_idx += 1
         self.frame_count = self._frame_n
-        return new_fn 
+        return new_capfn
 
     def _save_miscoded_frame(self, img, chunk, frame_number):
         path = self._get_miscoded_frame_path(self._basedir, chunk, frame_number)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         cv2.imwrite(path, img)
-        
+
     @staticmethod
     def _get_miscoded_frame_path(basedir, chunk, frame_number):
         return os.path.join(basedir, "miscoded", str(chunk).zfill(6), str(frame_number).zfill(10) + ".tiff")
@@ -228,6 +244,8 @@ class WritingStore(abc.ABC):
 
     def _save_chunk_metadata(self, path_without_extension, extension='.npz'):
         path = path_without_extension + extension
+        print("Length of frame_time", len(self._chunk_md["frame_time"]))
+
         self._save_index(path, self._chunk_md)
 
         # also calculate the filename of the extra file to hold any data

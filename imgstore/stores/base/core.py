@@ -161,15 +161,15 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         self.frame_count = 0
         self.frame_time = np.nan
         self.is_multistore = False
-        self._step1=True
+        self._previous_chunk_is_finished_and_next_not_yet_started=True
 
 
         self._log = logging.getLogger('imgstore')
         if _VERBOSE_VERY:
             _VERBOSE_DEBUG_GETS = VERBOSE_DEBUG_CHUNKS = True
             self._log = _Log
-            
-            
+
+
         self._first_chunk=first_chunk
         self._chunk_n = self._first_chunk
         self._chunk_current_frame_idx = -1
@@ -232,7 +232,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         the first chunk needs to be saved as .avi only,
         even though the rest of the chunks are saved as .mp4
         To prevent the indexing algorithm from ignoring this first few frames,
-        we need to copy the .avi to .mp4, pretending it is .mp4  
+        we need to copy the .avi to .mp4, pretending it is .mp4
         """
         extension = self._metadata["extension"]
 
@@ -243,7 +243,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
                 avi_file
             ) and not os.path.exists(
                 mp4_file
-            ):  
+            ):
                 warnings.warn(f"Copying {avi_file} -> {mp4_file}")
                 shutil.copy(avi_file, mp4_file)
 
@@ -275,7 +275,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
             raise error
         img, (frame_number, frame_time) = self.get_image(max(0, first_fn))
         return img, (frame_number, frame_time)
-    
+
     @property
     def frame_metadata(self):
         if len(self._frame_metadata) == 0:
@@ -307,7 +307,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
 
 
     def get_black_mask(self):
-        return np.zeros(self._metadata["imgshape"], np.uint8) 
+        return np.zeros(self._metadata["imgshape"], np.uint8)
 
     @classmethod
     def supports_format(cls, fmt):
