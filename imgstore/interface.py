@@ -19,6 +19,7 @@ class VideoCapture():
         MULTI_STORE_ENABLED=getattr(self._config, "MULTI_STORE_ENABLED", False)
         if MULTI_STORE_ENABLED:
             import imgstore.stores.multi as imgstore
+            print("MultiStore enabled")
         else:
             import imgstore.stores as imgstore
             self._stores = {"main": self}
@@ -64,10 +65,11 @@ class VideoCapture():
 
             self._cap = cap
             self._type = capture_type
-        except Exception as error:
+        except FileNotFoundError as error:
+            print(f"Working directory: {os.getcwd()}")
             print(traceback.print_exc())
-            print(error)
             import ipdb; ipdb.set_trace()
+            raise(error)
 
 
     def _get(self, property):
