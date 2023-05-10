@@ -65,6 +65,7 @@ setup(
            'imgstore-codecs = imgstore.apps:list_codecs',
            'imgstore-muxer = imgstore.apps:main_muxer',
            'imgstore2imgstore-muxer = imgstore.apps:imgstore_muxer',
+           'imgstore-index = imgstore.apps:main_indexer',
        ]
    },
 )
