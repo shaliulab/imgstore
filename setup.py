@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+sssusr/bin/env python
 # coding=utf-8
 
 # Authors: John Stowers <john@loopbio.com>, Santi Villalba <santi@loopbio.com>, Antonio Ortega <antonio.ortega@kuleuven.be>
@@ -20,7 +20,7 @@ setup(
    long_description=long_description,
    long_description_content_type='text/markdown',
    include_package_data=True,
-   version='0.4.21',
+   version='0.4.22',
    url='https://github.com/shaliulab/imgstore',
    author='John Stowers, Santi Villalba, Antonio Ortega',
    author_email='john@loopbio.com, santi@loopbio.com, antonio.ortega@kuleuven.be',
