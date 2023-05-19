@@ -1,4 +1,4 @@
-sssusr/bin/env python
+#! /usr/bin/env python
 # coding=utf-8
 
 # Authors: John Stowers <john@loopbio.com>, Santi Villalba <santi@loopbio.com>, Antonio Ortega <antonio.ortega@kuleuven.be>
