@@ -271,6 +271,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         try:
             first_fn=self._index.get_chunk_metadata(chunk)["frame_number"][0]
         except Exception as error:
+            import ipdb; ipdb.set_trace()
             print(f"Cannot find first frame of chunk {chunk}")
             raise error
         img, (frame_number, frame_time) = self.get_image(max(0, first_fn))

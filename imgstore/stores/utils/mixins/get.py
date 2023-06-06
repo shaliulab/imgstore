@@ -107,12 +107,13 @@ class GetMixin(GetTrajectoryMixin):
         if chunk_n is not None:
             with codetiming.Timer(text="Loading chunk took {milliseconds:.0f} ms", logger=logger.debug):
                 self._load_chunk(chunk_n)
+            chunk_n = self._chunk_n
 
         # ensure the read works before setting frame_number
         with codetiming.Timer(text="Loading image took {milliseconds:.0f} ms", logger=logger.debug):
             _img, (_frame_number, _frame_timestamp) = self._load_image(frame_idx)
             if _img is None:
-                warnings.warn(f"Cannot read frame_idx {frame_idx}. Skipping to chunk {self._chunk_n+1}")
+                warnings.warn(f"Cannot read chunk {chunk_n} frame_idx {frame_idx}. Skipping to chunk {self._chunk_n+1}")
                 return self._get_image(self._chunk_n+1, 0)
         with codetiming.Timer(text="Decoding image took {milliseconds:.0f} ms", logger=logger.debug):
             img = self._decode_image(_img)

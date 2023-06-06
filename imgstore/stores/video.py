@@ -38,11 +38,12 @@ def quality_control(metadata, cap):
     }
 
     for diff in diffs:
-        try:
-            assert diffs[diff] <= 1, f"{diff} is > 1 ({diffs[diff]})"
-        except AssertionError as error:
-            import ipdb; ipdb.set_trace()
-            raise error
+        assert diffs[diff] <= 1, f"""
+        {diff} is > 1 ({diffs[diff]})
+        {cap.get(cv2.CAP_PROP_FRAME_WIDTH)}x{cap.get(cv2.CAP_PROP_FRAME_HEIGHT)}
+        If either of these values is 0, the video is corrupted, maybe during upload from the lab to the vsc,
+        try sending it again
+        """
         if diffs[diff] == 1:
             warnings.warn(f"{diff} difference is 1")
 
