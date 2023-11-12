@@ -268,6 +268,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         """
         self._log.debug(f"{self}.get_chunk({chunk})")
         assert chunk is not None
+        assert isinstance(chunk, int)
         try:
             first_fn=self._index.get_chunk_metadata(chunk)["frame_number"][0]
         except Exception as error:
