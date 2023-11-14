@@ -5,6 +5,7 @@ import tempfile
 import cv2
 from imgstore.configuration import load_config, save_config
 from imgstore.stores.utils.verify import get_colorbar, verify_fourcc, frameSize, frameShape
+from imgstore.stores.utils.formats_constants import *
 
 logger = logging.getLogger(__name__)
 
@@ -26,23 +27,6 @@ except Exception:
 # https://answers.opencv.org/question/100967/codecs-list/
 
 
-opencv_formats = {
-    # 'mjpeg/avi': "MJPG",
-    # 'h264/mkv': "H264",
-    # 'h264/avi': "H264",
-     'h264/mp4': "h264",
-     'x264/mp4': "x264",
-    # 'avc1/mp4': "avc1",
-     'mp4v/mp4': "mp4v",
-     'mjpg/mp4': "mjpg",
-    # 'divx/avi': "DIVX",
-    # 'divx/avi': "divx",
-    'avc1/avi': "avc1",
-    # 'mpeg/avi': "MPEG",    
-}
-
-cv2_fmts = {'tif', 'png', 'jpg', 'ppm', 'pgm', 'bmp'}
-raw_fmts = {'npy', 'bpk'}
 
 def verify_all(all_fourcc, **kwargs):
 
@@ -72,7 +56,6 @@ def load_and_verify_cv2cuda_formats(**kwargs):
         }
     else:
         cv2cuda_fourcc = {}
-
 
     available = verify_all(cv2cuda_fourcc)
     available = cv2cuda_fourcc
@@ -124,7 +107,12 @@ def load_and_verify_raw_formats(**kwargs):
 def get_formats(video=False, directory=False, raw=False, **kwargs):
 
     opencv_fourcc = load_and_verify_opencv_formats(**kwargs)
-    cv2cuda_fourcc = load_and_verify_cv2cuda_formats(**kwargs)
+    try:
+        cv2cuda_fourcc = load_and_verify_cv2cuda_formats(**kwargs)
+    except:
+        print(f"cv2cuda may be installed but the h264_nvenc codec cannot be initialized")
+        cv2cuda_fourcc = {}
+
     dir_formats = load_and_verify_dir_formats(**kwargs)
     raw_formats = load_and_verify_raw_formats(**kwargs)
 
