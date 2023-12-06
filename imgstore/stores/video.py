@@ -273,7 +273,7 @@ class VideoImgStore(_ImgStore):
                     apiPreference=cv2.CAP_FFMPEG,
                     fourcc=codec,
                     fps=self.fps,
-                    frameSize=(w, h),
+                    frameSize=frameSize,
                     isColor=self._color
                 )
 
