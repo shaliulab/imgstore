@@ -264,6 +264,10 @@ class VideoImgStore(_ImgStore):
                     codec = self._codec
                     filename = self._capfn_
 
+
+                frameSize=(w, h)
+                print(f"Initializing VideoWriter. Filename {filename}, frameSize {frameSize}, color {self._color}, fps {self._fps}")
+
                 self._cap_ = cv2.VideoWriter(
                     filename=filename,
                     apiPreference=cv2.CAP_FFMPEG,
