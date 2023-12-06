@@ -221,16 +221,22 @@ class VideoImgStore(_ImgStore):
         fn = os.path.join(self._basedir, '%06d%s' % (new, self._ext))
         h, w = self._imgshape[:2]
 
-        # if self.burnin_period > 0:
         self._capfn_ = fn
-        self._capfn_hq_ = self._capfn_.replace(".mp4", ".avi")
-        self._cap_hq_ = cv2.VideoWriter(
-                filename=self._capfn_hq_,
-                fourcc=cv2.VideoWriter_fourcc(*"DIVX"),
-                fps=self.fps,
-                frameSize=(w, h),
-                isColor=self._color
-            )
+        if self.burnin_period > 0:
+            self._capfn_hq_ = self._capfn_.replace(".mp4", ".avi")
+            print(f"Initializing uncompressed video")
+            self._cap_hq_ = cv2.VideoWriter(
+                    filename=self._capfn_hq_,
+                    fourcc=cv2.VideoWriter_fourcc(*"DIVX"),
+                    fps=self.fps,
+                    frameSize=(w, h),
+                    isColor=self._color
+                )
+        else:
+            self._capfn_hq_=None
+            self._cap_hq_=None
+
+    
         try:
 
             if self._codec == "h264_nvenc" and not CV2CUDA_AVAILABLE:
