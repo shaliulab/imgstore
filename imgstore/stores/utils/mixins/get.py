@@ -68,7 +68,6 @@ class GetMixin(GetTrajectoryMixin):
         :param exact_only: If False return the nearest frame
         :param frame_index: frame_index (0, frame_count]
         """
-        # import ipdb; ipdb.set_trace()
         if _VERBOSE_DEBUG_GETS:
             self._log.debug('get_image %s (exact: %s) frame_idx %s' % (frame_number, exact_only, frame_index))
         if frame_index is not None:

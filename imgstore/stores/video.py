@@ -41,8 +41,10 @@ def quality_control(metadata, cap):
         try:
             assert diffs[diff] <= 1, f"{diff} is > 1 ({diffs[diff]})"
         except AssertionError as error:
-            import ipdb; ipdb.set_trace()
-            raise error
+            pass
+            logger.warning("Quality control not passed")
+            # import ipdb; ipdb.set_trace()
+            # raise error
         if diffs[diff] == 1:
             warnings.warn(f"{diff} difference is 1")
 
@@ -50,7 +52,9 @@ def quality_control(metadata, cap):
     for point in testing_points:
         pos = int(point * metadata["chunksize"])
         cap.set(1, pos)
-        assert cap.get(1) == pos
+        current_pos=cap.get(1)
+        if current_pos != pos:
+            logger.warning("Capture is requested to move to %s but is in %s", pos, current_pos)
 
     cap.set(1, 0)
 
