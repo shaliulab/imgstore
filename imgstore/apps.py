@@ -370,3 +370,14 @@ def imgstore_muxer():
         stores[cap].release()
 
 
+def main_indexer():
+    import argparse
+    import os.path
+    from imgstore.interface import VideoCapture
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--store-path", type=str, required=True)
+    parser.add_argument("--chunk", type=int, default=0)
+    args=parser.parse_args()
+    cap=VideoCapture(args.store_path, args.chunk)
+    cap.release()

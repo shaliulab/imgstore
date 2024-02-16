@@ -38,13 +38,12 @@ def quality_control(metadata, cap):
     }
 
     for diff in diffs:
-        try:
-            assert diffs[diff] <= 1, f"{diff} is > 1 ({diffs[diff]})"
-        except AssertionError as error:
-            pass
-            logger.warning("Quality control not passed")
-            # import ipdb; ipdb.set_trace()
-            # raise error
+        assert diffs[diff] <= 1, f"""
+        {diff} is > 1 ({diffs[diff]})
+        {cap.get(cv2.CAP_PROP_FRAME_WIDTH)}x{cap.get(cv2.CAP_PROP_FRAME_HEIGHT)}
+        If either of these values is 0, the video is corrupted, maybe during upload from the lab to the vsc,
+        try sending it again
+        """
         if diffs[diff] == 1:
             warnings.warn(f"{diff} difference is 1")
 
@@ -224,16 +223,22 @@ class VideoImgStore(_ImgStore):
         fn = os.path.join(self._basedir, '%06d%s' % (new, self._ext))
         h, w = self._imgshape[:2]
 
-        # if self.burnin_period > 0:
         self._capfn_ = fn
-        self._capfn_hq_ = self._capfn_.replace(".mp4", ".avi")
-        self._cap_hq_ = cv2.VideoWriter(
-                filename=self._capfn_hq_,
-                fourcc=cv2.VideoWriter_fourcc(*"DIVX"),
-                fps=self.fps,
-                frameSize=(w, h),
-                isColor=self._color
-            )
+        if self.burnin_period > 0:
+            self._capfn_hq_ = self._capfn_.replace(".mp4", ".avi")
+            print(f"Initializing uncompressed video")
+            self._cap_hq_ = cv2.VideoWriter(
+                    filename=self._capfn_hq_,
+                    fourcc=cv2.VideoWriter_fourcc(*"DIVX"),
+                    fps=self.fps,
+                    frameSize=(w, h),
+                    isColor=self._color
+                )
+        else:
+            self._capfn_hq_=None
+            self._cap_hq_=None
+
+    
         try:
 
             if self._codec == "h264_nvenc" and not CV2CUDA_AVAILABLE:
@@ -261,12 +266,16 @@ class VideoImgStore(_ImgStore):
                     codec = self._codec
                     filename = self._capfn_
 
+
+                frameSize=(w, h)
+                print(f"Initializing VideoWriter. Filename {filename}, frameSize {frameSize}, color {self._color}, fps {self._fps}")
+
                 self._cap_ = cv2.VideoWriter(
                     filename=filename,
                     apiPreference=cv2.CAP_FFMPEG,
                     fourcc=codec,
                     fps=self.fps,
-                    frameSize=(w, h),
+                    frameSize=frameSize,
                     isColor=self._color
                 )
 

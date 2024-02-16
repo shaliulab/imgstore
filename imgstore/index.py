@@ -121,13 +121,13 @@ class ImgStoreIndex(object):
                 except TypeError:
                     cls.log.error('corrupt chunk', exc_info=True)
                     continue
-            
+
             return records, chunks, (frame_min, frame_max, frame_time_min, frame_time_max)
 
 
     @classmethod
     def populate_database(cls, path, records_and_stats):
-        
+
         records, chunks, stats = records_and_stats
         (frame_min, frame_max, frame_time_min, frame_time_max) = stats
 
@@ -137,7 +137,7 @@ class ImgStoreIndex(object):
         cur = db.cursor()
 
         cur.executemany('INSERT INTO frames VALUES (?,?,?,?)', records)
-        
+
         with codetiming.Timer(text="CREATE UNIQUE INDEX id ON FRAMES (frame_number) took {:.8f} seconds to run", logger=logger.info):
             cur.execute("CREATE UNIQUE INDEX id ON frames (frame_number);")
 
@@ -151,7 +151,7 @@ class ImgStoreIndex(object):
         cur.execute('INSERT INTO summary VALUES (?,?)', ('frame_max', float(frame_max)))
         db.commit()
         return db
-            
+
     @classmethod
     def read_index_and_populate_database(cls, chunk_n_and_chunk_paths):
         path = os.path.join(os.path.dirname(chunk_n_and_chunk_paths[0][1]), SQLITE3_INDEX_FILE)
@@ -318,7 +318,7 @@ class ImgStoreIndex(object):
             # frame_time - value will be min 0
             cmd, args = ("SELECT chunk, frame_idx FROM frames WHERE ({} - ?) >= 0 ORDER BY ABS(? - {}) LIMIT 1;".format(what, what), (value, value))
 
-        
+
         cur.execute(cmd, args)
         try:
             chunk_n, frame_idx = cur.fetchone()
@@ -330,7 +330,7 @@ class ImgStoreIndex(object):
     def find_all(self, what, value, exact_only=True, past=True, future=True):
         assert what in ('frame_number', 'frame_time')
         cur = self._conn.cursor()
-        
+
         if exact_only:
             filter= f"WHERE {what} = ?"
             val_tuple = (value,)
@@ -364,7 +364,7 @@ class ImgStoreIndex(object):
             raise IndexError(error_msg)
         return data
 
-    
+
     def get_start_of_chunks(self):
         """
         Return the chunk and starting frame number

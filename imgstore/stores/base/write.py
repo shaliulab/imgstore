@@ -126,7 +126,7 @@ class WritingStore(abc.ABC):
 
 
         # this is true only if the chunk is almost finished and
-        if (self._frame_n % self._chunksize) > 0.9 * self._chunksize and self._previous_chunk_is_finished_and_next_not_yet_started:
+        if start_next_chunk and (self._frame_n % self._chunksize) > 0.9 * self._chunksize and self._previous_chunk_is_finished_and_next_not_yet_started:
             old = self._chunk_n
             new = self._chunk_n + 1
             self._previous_chunk_is_finished_and_next_not_yet_started=False

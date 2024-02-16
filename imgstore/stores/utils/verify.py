@@ -3,9 +3,15 @@ import cv2
 import numpy as np
 import tempfile
 from imgstore.configuration import load_config, save_config
+from imgstore.stores.utils.formats_constants import opencv_formats
+from imgstore.util import FourCC
+
 frameSize=(768, 1024)
 frameShape=frameSize[::-1]
-
+try:
+    import cv2cuda
+except:
+    cv2cuda=None
 
 
 RAINBOW = [
