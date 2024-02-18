@@ -318,7 +318,7 @@ class VideoImgStore(_ImgStore):
 
     @property
     def burnin_period(self):
-        if self._ext == ".mp4" and os.path.exists(self._capfn_hq) and self._cap_hq is not None:
+        if self._ext == ".mp4" and self._capfn_hq is not None and os.path.exists(self._capfn_hq) and self._cap_hq is not None:
             if self._metadata.get("burnin_period", 2)  == 0:
                 period = 0 # s
             else:
