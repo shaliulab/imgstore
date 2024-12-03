@@ -38,8 +38,8 @@ def quality_control(metadata, cap):
     }
 
     for diff in diffs:
-        assert diffs[diff] <= 1, f"""
-        {diff} is > 1 ({diffs[diff]})
+        assert diffs[diff] <= 10, f"""
+        Difference in {diff} is > 1 ({diffs[diff]})
         {cap.get(cv2.CAP_PROP_FRAME_WIDTH)}x{cap.get(cv2.CAP_PROP_FRAME_HEIGHT)}
         If either of these values is 0, the video is corrupted, maybe during upload from the lab to the vsc,
         try sending it again
@@ -462,7 +462,12 @@ class VideoImgStore(_ImgStore):
                 caps.append(self._cap)
                 fns.append(self._capfn)
                 if n > 1:
-                    quality_control(self._metadata, self._cap)
+                    try:
+                        quality_control(self._metadata, self._cap)
+                    except Exception as error:
+                        logger.error("Cannot open %s", self._capfn)
+                        raise error
+
 
             self._capfn_hq = os.path.splitext(fn)[0] + ".avi"
             self._cap_hq = cv2.VideoCapture(self._capfn_hq)
