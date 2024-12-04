@@ -123,7 +123,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
     FRAME_MD = _FRAME_MD
 
     # noinspection PyShadowingBuiltins
-    def __init__(self, basedir, mode, fps=25, imgshape=None, imgdtype=np.uint8, chunksize=None, metadata=None,
+    def __init__(self, basedir, mode, fps=25, imgshape=None, imgdtype=np.uint8, chunksize=None, metadata=None, square=True,
                  encoding=None, write_encode_encoding=None, format=None, index=None, encoder_kwargs={}, first_chunk=0, **kwargs):
         if mode not in self._supported_modes:
             raise ValueError('mode not supported')
@@ -144,6 +144,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         self._decode_image = None
         self._encode_image = None
         self._uuid = None
+        self._square=square
 
         self._metadata = {"framerate": fps, **kwargs, "encoder_kwargs": encoder_kwargs}
         self._user_metadata = {}

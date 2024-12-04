@@ -10,7 +10,7 @@ import codetiming
 import cv2
 import numpy as np
 from imgstore.constants import STORE_MD_KEY, VERBOSE_DEBUG_CHUNKS
-from imgstore.util import ensure_color, ensure_grayscale
+from imgstore.util import ensure_color, ensure_grayscale, ensure_square
 from imgstore.stores.utils.formats import get_formats
 from imgstore.stores.base import _ImgStore
 
@@ -79,7 +79,7 @@ class VideoImgStore(_ImgStore):
         self._capfn = None
         self._capfn_hq = None
         self._last_capfn=None
-
+        
 
         fmt = kwargs.get('format')
         # backwards compat
@@ -432,6 +432,10 @@ class VideoImgStore(_ImgStore):
                 img = ensure_color(_img)
             else:
                 img = ensure_grayscale(_img)
+        
+        if self._square:
+            with codetiming.Timer(text="Ensuring square took {milliseconds:.0f} ms", logger=logger.debug):
+                img=ensure_square(img)
 
         if self._metadata.get("apply_blur", False):
             with codetiming.Timer(text="Applying gaussian blur took {milliseconds:.0f} ms", logger=logger.debug):

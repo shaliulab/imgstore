@@ -36,6 +36,17 @@ def _cvt_color(img, code, ensure_copy=True):
 def ensure_grayscale(img, ensure_copy=False):
     return _cvt_color(img, cv2.COLOR_BGR2GRAY, ensure_copy=ensure_copy)
 
+def ensure_square(img):
+    """
+    If the image is rectangular,
+    clip the longest side to the length of the shortest side
+    """
+    if img.shape[0] > img.shape[1]:
+        img=img[:img.shape[1], :img.shape[1]]
+    elif img.shape[0] < img.shape[1]:
+        img=img[:img.shape[0], :img.shape[0]]
+    return img
+
 
 def ensure_color(img, ensure_copy=False):
     return _cvt_color(img, cv2.COLOR_GRAY2BGR, ensure_copy=ensure_copy)
