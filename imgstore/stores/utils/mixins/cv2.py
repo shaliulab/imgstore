@@ -118,10 +118,22 @@ class CV2Mixin:
         return int(self._metadata["framerate"])
 
     def _get_width(self):
-        return int(self._metadata["imgshape"][1])
+        shape = self._metadata["imgshape"]
+        if shape[0]!=shape[1]:
+            width=min(shape)
+        else:
+            width = shape[1]
+
+        return int(width)
 
     def _get_height(self):
-        return int(self._metadata["imgshape"][0])
+        shape = self._metadata["imgshape"]
+        if shape[0]!=shape[1]:
+            height=min(shape)
+        else:
+            height = shape[0]
+
+        return int(height)
 
     def _get_fourcc(self):
         raise NotImplementedError
