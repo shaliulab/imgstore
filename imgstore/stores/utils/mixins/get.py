@@ -91,6 +91,7 @@ class GetMixin(GetTrajectoryMixin):
             # open the next chunk
             next_chunk = self._chunk_n + 1
             if next_chunk not in self._index.chunks:
+                logger.error("Cannot read chunk %s", next_chunk)
                 raise EOFError
 
             self._load_chunk(next_chunk)
