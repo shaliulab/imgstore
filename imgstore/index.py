@@ -29,7 +29,11 @@ def _load_index(path_without_extension):
                     except Exception as error:
                         print(f"Cannot open {f}")
                         raise error
-                    return {k: dat[k].tolist() for k in FRAME_MD}
+                    try:
+                        return {k: dat[k].tolist() for k in FRAME_MD}
+                    except Exception as error:
+                        print(f"Cant open {path_without_extension + extension}")
+                        raise error
 
     raise IOError('could not find index %s' % path_without_extension)
 

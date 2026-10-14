@@ -37,15 +37,15 @@ def quality_control(metadata, cap):
         "duration": metadata["chunksize"] - cap.get(cv2.CAP_PROP_FRAME_COUNT),
     }
 
-    for diff in diffs:
-        assert diffs[diff] <= 10, f"""
-        Difference in {diff} is > 1 ({diffs[diff]})
+    for magnitude in diffs:
+        assert diffs[magnitude] <= 10, f"""
+        Difference in {magnitude} is > 1 ({diffs[magnitude]})
         {cap.get(cv2.CAP_PROP_FRAME_WIDTH)}x{cap.get(cv2.CAP_PROP_FRAME_HEIGHT)}
         If either of these values is 0, the video is corrupted, maybe during upload from the lab to the vsc,
         try sending it again
         """
-        if diffs[diff] == 1:
-            warnings.warn(f"{diff} difference is 1")
+        if diffs[magnitude] == 1:
+            warnings.warn(f"{magnitude} difference is 1")
 
     testing_points = [0.1, 0.5, 0.9]
     for point in testing_points:
@@ -65,6 +65,40 @@ def find_chunks_video(basedir, ext, chunk_numbers=None):
         chunk_numbers = list(map(int, map(operator.itemgetter(0), map(os.path.splitext, avis))))
     data = list(zip(chunk_numbers, tuple(os.path.join(basedir, '%06d' % n) for n in chunk_numbers)))
     return data
+
+def safe_set_frame(cap, frame_number):
+    """
+    Attempts to seek to frame_idx in a VideoCapture object.
+    If seeking fails, it falls back to sequential reading.
+    """
+    chunk=int(frame_number//cap._chunksize)
+    # Try setting frame position
+    frame_number_0=int(cap._chunksize*chunk)
+    pos=cap.frame_number%cap._chunksize
+    
+    frame_idx=frame_number%cap._chunksize
+
+    n_calls=frame_idx-pos-1
+    
+    cap._load_chunk(chunk)
+    # cap.frame_number=frame_number_0-1
+    success=True
+
+    if n_calls<0:
+        cap._cap.set(1, 0)
+        n_calls=frame_idx
+
+    print(f"Warning: Seeking failed for frame {frame_number}, falling back to sequential read (n_calls={n_calls}).")
+    if success and n_calls>0:
+        for _ in tqdm.tqdm(range(n_calls)):
+            success, img=cap._cap.read()
+            if not success:
+                print(f"Error: Could not read frame {frame_number} sequentially.")
+                return False, None
+        return True, img
+    else:
+        return False, None
+    
 
 class VideoImgStore(_ImgStore):
     _supported_modes = 'wr'
@@ -382,13 +416,20 @@ class VideoImgStore(_ImgStore):
                 _img = self._last_img.copy()
 
             else:
-                if self._supports_seeking:
+                if self._supports_seeking and not self._chunk_n in self._metadata.get("no_seeking_support", []):
                     # only seek if we have to, otherwise take the fast path
                     if (idx - self._chunk_current_frame_idx) != 1:
                         # print(f"{idx - self._chunk_current_frame_idx} frames in the future")
                         cap.set(getattr(cv2, "CAP_PROP_POS_FRAMES", 1), idx)
+                    ret, _img = self._read(cap)
+
                 else:
-                    raise Exception("Only videos with seeking support enabled")
+
+                    fn0=int(self._chunk_n*self._chunksize)
+                    fn=int(fn0+idx+1)
+                    ret, _img=safe_set_frame(self, fn)
+
+                    # raise Exception("Only videos with seeking support enabled")
                     # TODO
                     # Return back support for videos without seeking
                     # support by dealing here both with _cap and _cap_hq
@@ -400,7 +441,6 @@ class VideoImgStore(_ImgStore):
                     #     _, img = cap.read()
                     #     i += 1
 
-                ret, _img = self._read(cap)
                 if not ret and idx < cap.get(7):
                     warnings.warn("Weird behavior of VideoCapture object. Resetting")
                     cap.set(1, 0)
@@ -474,19 +514,20 @@ class VideoImgStore(_ImgStore):
 
 
             self._capfn_hq = os.path.splitext(fn)[0] + ".avi"
-            self._cap_hq = cv2.VideoCapture(self._capfn_hq)
-            caps.append(self._cap_hq)
-            fns.append(self._capfn_hq)
+            if os.path.exists(self._capfn_hq):
+                self._cap_hq = cv2.VideoCapture(self._capfn_hq)
+                caps.append(self._cap_hq)
+                fns.append(self._capfn_hq)
 
-            self._chunk_current_frame_idx = -1
+                self._chunk_current_frame_idx = -1
 
-            for fn, cap in zip(fns, caps):
-                if not cap.isOpened():
-                    if fn == self._capfn_hq:
-                        self._log.warning(f"Cannot open {fn}")
-                        self._cap_hq = None
-                    else:
-                        raise Exception("OpenCV unable to open %s" % fn)
+                for fn, cap in zip(fns, caps):
+                    if not cap.isOpened():
+                        if fn == self._capfn_hq:
+                            self._log.warning(f"Cannot open {fn}")
+                            self._cap_hq = None
+                        else:
+                            raise Exception("OpenCV unable to open %s" % fn)
 
             self._chunk_md = self._index.get_chunk_metadata(n)
 

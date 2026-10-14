@@ -68,10 +68,6 @@ class CV2Mixin:
 
     def _set_posframes(self, posframes):
 
-        # frame_number_0 = self._get_chunk_metadata(self._chunk_n)[
-        #     "frame_number"
-        # ][0]
-        # posframes += frame_number_0
 
         if posframes - 1 < 0:
             posframes_f = 0
