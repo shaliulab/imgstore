@@ -47,6 +47,8 @@ setup(
        'python-dateutil',
        'confapp-shaliulab==1.1.13',
        'codetiming',
+       'tqdm',
+       'toml; python_version<"3.11"',
    ],
    tests_require=[
        'pytest',
@@ -66,6 +68,7 @@ setup(
            'imgstore-muxer = imgstore.apps:main_muxer',
            'imgstore2imgstore-muxer = imgstore.apps:imgstore_muxer',
            'imgstore-index = imgstore.apps:main_indexer',
+           'imgstore-crop-arenas = imgstore.crop_arenas:main',
        ]
    },
 )
