@@ -27,7 +27,7 @@ Alternatively, one table per arena with either a polygon or x, y, width, height
     polygon = [[x, y], [x, y], ...]
 
 Pass --size 1024 to give all arena videos the same size: each ROI is cropped to its
-bounding box and padded with black to 1024x1024, with the ROI center in the center
+bounding box and padded with white to 1024x1024, with the ROI center in the center
 of the frame (the pixel scale is not changed). The arena block of each metadata.yaml
 has the offset to map arena coordinates back to the original frame:
 
@@ -285,7 +285,7 @@ def _crop_chunk(video, outputs, extension, codec, crf, lossless, gpu):
         crop = f"[s{i}]crop={x1 - x0}:{y1 - y0}:{x0}:{y0}"
         if padding is not None:
             width, height, pad_x, pad_y = padding
-            crop += f",pad={width}:{height}:{pad_x}:{pad_y}:black"
+            crop += f",pad={width}:{height}:{pad_x}:{pad_y}:white"
         filters.append(crop + f"[c{i}]")
 
     command += ["-filter_complex", ";".join(filters)]
@@ -308,7 +308,7 @@ def _crop_chunk(video, outputs, extension, codec, crf, lossless, gpu):
 def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, jobs=4, chunks=None, size=None, gpu=False):
     """
     size: (width, height) of all output videos. ROIs are cropped to their bounding box
-    and padded with black up to this size, with the ROI center in the center of the frame.
+    and padded with white up to this size, with the ROI center in the center of the frame.
     If None, each output video has the size of the bounding box of its ROI
     """
     for program in ("ffmpeg", "ffprobe"):
@@ -403,7 +403,7 @@ def get_parser():
     parser.add_argument("--output", default=None, help="Output folder. Default: arenas/ next to the input metadata.yaml")
     parser.add_argument("--size", type=parse_size, default=None, help="""
         Common size of all arena videos, e.g. 1024 or 1024x1024 (width x height).
-        Each ROI is cropped to its bounding box and padded with black to this size, centered.
+        Each ROI is cropped to its bounding box and padded with white to this size, centered.
         Default: the size of each ROI's bounding box""")
     parser.add_argument("--codec", default=None, help="ffmpeg video encoder, e.g. libx264 or h264_nvenc. Default: same codec as the source chunks")
     parser.add_argument("--gpu", action="store_true", default=False, help="Encode h264/hevc chunks on the NVIDIA GPU (h264_nvenc/hevc_nvenc), ~7x faster than libx264")
