@@ -1,3 +1,4 @@
+import functools
 import logging
 import shutil
 import os.path
@@ -23,6 +24,16 @@ except Exception:
 
 isColor=False
 ONLY_ALLOW_EVEN_SIDES=True
+
+
+@functools.lru_cache(maxsize=1)
+def _debug_message():
+    """Contents of debug_imgstore.txt in the working directory (read only once per process)"""
+    try:
+        with open("debug_imgstore.txt", "r") as filehandle:
+            return filehandle.read().strip("\n")
+    except OSError:
+        return "no-debug"
 
 logger = logging.getLogger(__name__)
 
@@ -396,11 +407,7 @@ class VideoImgStore(_ImgStore):
         return frame_number_criterion and codec_criterion
 
     def _load_image(self, idx):
-        try:
-            with open("debug_imgstore.txt", "r") as filehandle:
-                message = filehandle.read().strip("\n")
-        except:
-            message = "no-debug"
+        message = _debug_message()
 
         with codetiming.Timer(text="Reading image took {milliseconds:.0f} ms", logger=logger.debug):
             if (idx+1) < self.burnin_period:

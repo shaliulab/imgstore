@@ -14,7 +14,7 @@ class VideoCapture():
 
     def __init__(self, path, chunk=None):
         import imgstore.constants
-        self._config = conf.__dict__
+        self._config = conf
 
         MULTI_STORE_ENABLED=getattr(self._config, "MULTI_STORE_ENABLED", False)
         if MULTI_STORE_ENABLED:
@@ -48,7 +48,7 @@ class VideoCapture():
 
                 cap.get_chunk(self._chunk)
                 if getattr(self._config, "MULTI_STORE_ENABLED", False):
-                    if self._config.SELECTED_STORE:
+                    if getattr(self._config, "SELECTED_STORE", None):
                         if self._config.SELECTED_STORE in cap._stores:
                             cap.select_store(self._config.SELECTED_STORE)
                         else:
@@ -66,10 +66,8 @@ class VideoCapture():
             self._cap = cap
             self._type = capture_type
         except FileNotFoundError as error:
-            print(f"Working directory: {os.getcwd()}")
-            print(traceback.print_exc())
-            import ipdb; ipdb.set_trace()
-            raise(error)
+            logger.error(f"Could not open {path} (chunk {chunk}). Working directory: {os.getcwd()}")
+            raise error
 
 
     def _get(self, property):
@@ -160,6 +158,7 @@ class VideoCapture():
     def __setstate__(self, d):
 
         self.__dict__ = d
+        self._config = conf
         if "_path" not in d:
             basedir = d["_basedir"]
 
@@ -168,7 +167,7 @@ class VideoCapture():
             cap = imgstore.new_for_filename(path)
             if "_chunk" in d:
                 cap.get_chunk(d["_chunk"])
-            if getattr(self._config, "MULTI_STORE_ENABLED", False):
+            if getattr(self._config, "MULTI_STORE_ENABLED", False) and getattr(self._config, "SELECTED_STORE", None):
                 # check that we are not loading the SELECTED_STORE now! in that case, just leave it
                 # this check is done because in that case:
                 # os.path.dirname(config.SELECTED_STORE) == os.path.basename(cap._basedir)
