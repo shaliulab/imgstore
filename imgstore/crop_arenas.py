@@ -35,6 +35,10 @@ has the offset to map arena coordinates back to the original frame:
 
 Chunks are re-encoded with the same codec as the source chunks (crf 12 by default, or --lossless)
 
+Files that are the same for all arenas (camera .pfs file, chunk .extra.json environment data)
+are soft linked into each arena folder, and chunk snapshots (.png) are cropped like the videos.
+Pass --no-videos to only do this in arena folders produced before
+
 Requires ffmpeg and ffprobe in the PATH
 """
 
@@ -73,6 +77,10 @@ from imgstore.stores.utils.path import get_fullpath
 logger = logging.getLogger(__name__)
 
 POLYGON_KEYS = ("polygon", "points", "vertices", "contour", "roi")
+
+# files of the original recording that are the same for all arenas
+SHARED_FILES = ("*.pfs", "[0-9]" * 6 + ".extra.json")
+SNAPSHOT_PATTERN = "[0-9]" * 6 + ".png"
 
 
 def _parse_roi_string(roi):
@@ -305,7 +313,64 @@ def _crop_chunk(video, outputs, extension, codec, crf, lossless, gpu):
     return encoder_args
 
 
-def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, jobs=4, chunks=None, size=None, gpu=False):
+def link_shared_files(basedir, folder):
+    """
+    Soft link the files of the original recording that are the same for all arenas
+    """
+    for pattern in SHARED_FILES:
+        for path in sorted(glob.glob(os.path.join(basedir, pattern))):
+            dest = os.path.join(folder, os.path.basename(path))
+            if os.path.islink(dest):
+                os.remove(dest)
+            elif os.path.exists(dest):
+                logger.warning("%s exists and is not a link. Not replacing it", dest)
+                continue
+            os.symlink(os.path.realpath(path), dest)
+
+
+def crop_image(img, bbox, offset, shape):
+    """
+    Crop an image of the original recording like the arena videos:
+    crop to the bbox and pad with white up to shape (height, width)
+    """
+    x0, y0, x1, y1 = bbox
+    pad_x, pad_y = x0 - offset[0], y0 - offset[1]
+    cropped = np.full((shape[0], shape[1]) + img.shape[2:], 255, dtype=img.dtype)
+    cropped[pad_y:pad_y + y1 - y0, pad_x:pad_x + x1 - x0] = img[y0:y1, x0:x1]
+    return cropped
+
+
+def crop_snapshots(basedir, folder, bbox, offset, shape, chunks=None):
+    """
+    Write the chunk snapshots (.png) of the original recording cropped to the arena
+    """
+    for path in sorted(glob.glob(os.path.join(basedir, SNAPSHOT_PATTERN))):
+        chunk = int(os.path.basename(path)[:6])
+        if chunks is not None and chunk not in chunks:
+            continue
+        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        if img is None:
+            logger.warning("Cannot read snapshot %s. Skipping", path)
+            continue
+        cv2.imwrite(os.path.join(folder, os.path.basename(path)), crop_image(img, bbox, offset, shape))
+
+
+def complete_arena_folder(folder, chunks=None):
+    """
+    Add to an arena folder the files of the original recording which are not videos:
+    soft links to the files shared by all arenas and the cropped chunk snapshots.
+    The original recording and the crop are read from the arena metadata.yaml
+    """
+    with open(os.path.join(folder, STORE_MD_FILENAME), "r") as filehandle:
+        metadata = yaml.load(filehandle, Loader=yaml.SafeLoader)
+
+    arena = metadata["arena"]
+    basedir = arena["source"]
+    link_shared_files(basedir, folder)
+    crop_snapshots(basedir, folder, arena["bbox"], arena["offset"], metadata[STORE_MD_KEY]["imgshape"], chunks=chunks)
+
+
+def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, jobs=4, chunks=None, size=None, gpu=False, videos=True):
     """
     size: (width, height) of all output videos. ROIs are cropped to their bounding box
     and padded with white up to this size, with the ROI center in the center of the frame.
@@ -327,6 +392,13 @@ def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, 
 
     if output is None:
         output = os.path.join(basedir, "arenas")
+
+    if not videos:
+        # keep the metadata.yaml (and uuid) of the arena folders produced before
+        folders = [os.path.join(output, str(i + 1)) for i in range(len(polygons))]
+        for folder in folders:
+            complete_arena_folder(folder, chunks=chunks)
+        return folders
 
     video_chunks = _find_chunks(basedir, extension)
     if chunks is not None:
@@ -382,6 +454,9 @@ def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, 
             encoder_args = future.result()
             logger.debug("Chunk %s encoded with %s", futures[future], " ".join(encoder_args))
 
+    for folder, _, _ in outputs:
+        complete_arena_folder(folder, chunks=chunks)
+
     return [folder for folder, _, _ in outputs]
 
 
@@ -411,13 +486,16 @@ def get_parser():
     parser.add_argument("--lossless", action="store_true", default=False, help="Encode losslessly (h264/hevc only, much bigger files)")
     parser.add_argument("--jobs", type=int, default=4, help="Number of chunks processed in parallel")
     parser.add_argument("--chunks", type=int, nargs="+", default=None, help="Only process these chunks")
+    parser.add_argument("--no-videos", dest="videos", action="store_false", default=True, help="""
+        Do not crop the videos. Only link the files shared by all arenas and crop the snapshots
+        in the arena folders produced before""")
     return parser
 
 
 def main():
     logging.basicConfig(level=logging.INFO)
     args = get_parser().parse_args()
-    crop_arenas(args.input, args.arenas, output=args.output, codec=args.codec, crf=args.crf, lossless=args.lossless, jobs=args.jobs, chunks=args.chunks, size=args.size, gpu=args.gpu)
+    crop_arenas(args.input, args.arenas, output=args.output, codec=args.codec, crf=args.crf, lossless=args.lossless, jobs=args.jobs, chunks=args.chunks, size=args.size, gpu=args.gpu, videos=args.videos)
 
 
 if __name__ == "__main__":
