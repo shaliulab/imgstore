@@ -325,7 +325,8 @@ def link_shared_files(basedir, folder):
             elif os.path.exists(dest):
                 logger.warning("%s exists and is not a link. Not replacing it", dest)
                 continue
-            os.symlink(os.path.realpath(path), dest)
+            # relative, so that the links survive moving the whole recording
+            os.symlink(os.path.relpath(os.path.realpath(path), os.path.realpath(folder)), dest)
 
 
 def crop_image(img, bbox, offset, shape):
@@ -377,7 +378,7 @@ def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, 
     If None, each output video has the size of the bounding box of its ROI
     """
     for program in ("ffmpeg", "ffprobe"):
-        if shutil.which(program) is None:
+        if videos and shutil.which(program) is None:
             raise RuntimeError(f"{program} not found in PATH")
 
     fullpath = input if os.path.isfile(input) else get_fullpath(input)
