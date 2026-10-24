@@ -390,7 +390,9 @@ class VideoImgStore(_ImgStore):
                 if dimension % 2 != 0:
                     dims[i] -= 1
 
-            img = img[:dims[0], :dims[1]].copy(order="C")
+            # copy only if the frame is cropped (the copy of a full 4K frame is slow)
+            if dims[0] != img.shape[0] or dims[1] != img.shape[1]:
+                img = img[:dims[0], :dims[1]].copy(order="C")
         return ret, img
 
     def frame_is_miscoded(self, frame_number):
