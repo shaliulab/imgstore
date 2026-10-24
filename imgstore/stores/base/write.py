@@ -134,7 +134,8 @@ class WritingStore(abc.ABC):
 
 
         # this is true only if the chunk is finished or we are at the beginning of the first chunk
-        if (self._frame_n % self._chunksize) == 0 or (self._frame_n == 1 and self._chunk_n == 0 and not self._already_init):
+        # (only when recording: if start_next_chunk is False, chunk 0 would be closed after its first frame)
+        if (self._frame_n % self._chunksize) == 0 or (start_next_chunk and self._frame_n == 1 and self._chunk_n == 0 and not self._already_init):
             old = self._chunk_n
             if self._chunk_n == 0 and not self._already_init:
                 self._already_init = True
