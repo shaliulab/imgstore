@@ -430,6 +430,8 @@ def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, 
             "imgshape": shape + list(imgshape[2:]),
             "extension": extension,
             "uuid": uuid.uuid4().hex,
+            # chunk snapshots are optional in arena folders, so the flyhostel dbfile export should not require them
+            "must_have_snapshot": False,
         }
         arena_metadata["arena"] = {
             "source": os.path.realpath(basedir),
