@@ -34,6 +34,8 @@ has the offset to map arena coordinates back to the original frame:
     original (x, y) = arena (x, y) + offset
 
 Chunks are re-encoded with the same codec as the source chunks (crf 12 by default, or --lossless)
+With --gpu, chunks that fail because the GPU is busy (e.g. no free NVENC session) are retried
+an hour later and then whenever the user presses Enter. Other GPU failures are encoded on the CPU
 
 Files that are the same for all arenas (camera .pfs file, chunk .extra.json environment data)
 are soft linked into each arena folder, and chunk snapshots (.png) are cropped like the videos.
@@ -56,6 +58,8 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
+import time
 import uuid
 
 import cv2
@@ -225,6 +229,17 @@ GPU_ENCODERS = {
     "h264": "h264_nvenc",
     "hevc": "hevc_nvenc",
 }
+# CPU encoder used when a GPU encoder cannot be used
+CPU_ENCODERS = {encoder: ENCODERS[codec_name] for codec_name, encoder in GPU_ENCODERS.items()}
+
+# ffmpeg errors of a GPU busy with other processes (no free NVENC session or GPU memory)
+GPU_BUSY_ERRORS = ("InitializeEncoder failed", "OpenEncodeSessionEx failed", "out of memory", "CUDA_ERROR")
+# seconds to wait before retrying a chunk on a busy GPU. If it fails again, the user is asked when to retry
+GPU_RETRY_WAIT = 3600
+
+_prompt_lock = threading.Lock()
+# number of times the user asked to retry the chunks waiting for the GPU
+_retry_requests = 0
 
 
 def probe_video(video):
@@ -289,8 +304,63 @@ def _crop_chunk(video, outputs, extension, codec, crf, lossless, gpu):
     encoded with the same codec as the source chunk
     """
     chunk = os.path.basename(video)[:6]
-    encoder_args = get_encoder_args(probe_video(video), codec=codec, crf=crf, lossless=lossless, gpu=gpu)
+    stream = probe_video(video)
+    encoder_args = get_encoder_args(stream, codec=codec, crf=crf, lossless=lossless, gpu=gpu)
 
+    process = _run_ffmpeg(video, chunk, outputs, extension, encoder_args)
+    if process.returncode != 0 and encoder_args[1].endswith("_nvenc"):
+        # a GPU shared with other processes may have no free NVENC session (or memory) for a while
+        if _gpu_busy(process):
+            logger.warning("GPU busy encoding chunk %s, retrying in %s s:\n%s", chunk, GPU_RETRY_WAIT, process.stderr.strip())
+            time.sleep(GPU_RETRY_WAIT)
+            requests = _retry_requests
+            process = _run_ffmpeg(video, chunk, outputs, extension, encoder_args)
+            while _gpu_busy(process) and _wait_for_user(chunk, requests):
+                requests = _retry_requests
+                process = _run_ffmpeg(video, chunk, outputs, extension, encoder_args)
+
+        if process.returncode != 0:
+            # e.g. h264_nvenc refuses frames smaller than its minimum dimensions
+            cpu_codec = CPU_ENCODERS.get(codec, codec)
+            encoder_args = get_encoder_args(stream, codec=cpu_codec, crf=crf, lossless=lossless, gpu=False)
+            logger.warning("GPU encoding of chunk %s failed, encoding it with %s:\n%s", chunk, encoder_args[1], process.stderr.strip())
+            process = _run_ffmpeg(video, chunk, outputs, extension, encoder_args)
+
+    if process.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed on {video} (exit code {process.returncode}):\n{process.stderr}")
+
+    index = video[:-len(os.path.splitext(video)[1])] + ".npz"
+    for output, _, _ in outputs:
+        shutil.copy(index, os.path.join(output, chunk + ".npz"))
+
+    return encoder_args
+
+
+def _gpu_busy(process):
+    return process.returncode != 0 and any(error in process.stderr for error in GPU_BUSY_ERRORS)
+
+
+def _wait_for_user(chunk, requests):
+    """
+    Wait until the user presses Enter to retry encoding on the GPU.
+    One press retries all chunks that failed before it (requests is _retry_requests before their last attempt).
+    Return False if there is no user to ask (stdin is not interactive)
+    """
+    global _retry_requests
+    with _prompt_lock:
+        if _retry_requests == requests:
+            try:
+                input(f"\nGPU still busy encoding chunk {chunk}. Press Enter to retry when it is available\n")
+            except EOFError:
+                return False
+            _retry_requests += 1
+    return True
+
+
+def _run_ffmpeg(video, chunk, outputs, extension, encoder_args):
+    """
+    Decode the chunk once and encode one cropped video per arena with encoder_args
+    """
     filters = [f"[0:v]split={len(outputs)}" + "".join(f"[s{i}]" for i in range(len(outputs)))]
     command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", video]
     for i, (output, (x0, y0, x1, y1), padding) in enumerate(outputs):
@@ -305,16 +375,7 @@ def _crop_chunk(video, outputs, extension, codec, crf, lossless, gpu):
         command += ["-map", f"[c{i}]", "-an", "-fps_mode", "passthrough"] + encoder_args
         command.append(os.path.join(output, chunk + extension))
 
-    process = subprocess.run(command, stderr=subprocess.PIPE, text=True)
-    if process.returncode != 0:
-        # e.g. h264_nvenc refuses frames smaller than its minimum dimensions
-        raise RuntimeError(f"ffmpeg failed on {video} (exit code {process.returncode}):\n{process.stderr}")
-
-    index = video[:-len(os.path.splitext(video)[1])] + ".npz"
-    for output, _, _ in outputs:
-        shutil.copy(index, os.path.join(output, chunk + ".npz"))
-
-    return encoder_args
+    return subprocess.run(command, stderr=subprocess.PIPE, text=True)
 
 
 def link_shared_files(basedir, folder):
