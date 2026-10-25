@@ -39,6 +39,9 @@ Files that are the same for all arenas (camera .pfs file, chunk .extra.json envi
 are soft linked into each arena folder, and chunk snapshots (.png) are cropped like the videos.
 Pass --no-videos to only do this in arena folders produced before
 
+Once all arenas are cropped, roi-proposer propose (from the roi-proposer environment) is run
+on all arena folders to propose their DATE_TIME.toml and landmarks.toml. Pass --no-roi-proposer to skip it
+
 Requires ffmpeg and ffprobe in the PATH
 """
 
@@ -52,6 +55,7 @@ import os.path
 import re
 import shutil
 import subprocess
+import sys
 import uuid
 
 import cv2
@@ -463,6 +467,33 @@ def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, 
     return [folder for folder, _, _ in outputs]
 
 
+def find_roi_proposer():
+    """roi-proposer lives in the roi-proposer environment, next to this one"""
+    if shutil.which("roi-proposer"):
+        return shutil.which("roi-proposer")
+    envs = [os.path.dirname(sys.prefix)]
+    if os.environ.get("CONDA_EXE"):
+        envs.append(os.path.join(os.path.dirname(os.path.dirname(os.environ["CONDA_EXE"])), "envs"))
+    for env_dir in envs:
+        path = os.path.join(env_dir, "roi-proposer", "bin", "roi-proposer")
+        if os.path.exists(path):
+            return path
+    raise FileNotFoundError("roi-proposer not found in the roi-proposer environment, pass --roi-proposer")
+
+
+def propose_rois(folders, executable=None):
+    """
+    Propose the idtrackerai tomls of every arena folder with roi-proposer propose
+    """
+    if executable is None:
+        executable = find_roi_proposer()
+    logger.info("Proposing ROIs with %s propose for %s arenas", executable, len(folders))
+    process = subprocess.run([executable, "propose"] + list(folders))
+    if process.returncode != 0:
+        logger.error("roi-proposer propose failed on some arenas (exit code %s)", process.returncode)
+    return process.returncode
+
+
 def parse_size(value):
     """
     Parse 1024 or 1024x768 (width x height)
@@ -492,13 +523,18 @@ def get_parser():
     parser.add_argument("--no-videos", dest="videos", action="store_false", default=True, help="""
         Do not crop the videos. Only link the files shared by all arenas and crop the snapshots
         in the arena folders produced before""")
+    parser.add_argument("--roi-proposer", default=None, help="roi-proposer executable (default: the one in the roi-proposer environment)")
+    parser.add_argument("--no-roi-proposer", dest="propose_rois", action="store_false", default=True, help="""
+        Do not run roi-proposer propose on the arena folders after cropping them""")
     return parser
 
 
 def main():
     logging.basicConfig(level=logging.INFO)
     args = get_parser().parse_args()
-    crop_arenas(args.input, args.arenas, output=args.output, codec=args.codec, crf=args.crf, lossless=args.lossless, jobs=args.jobs, chunks=args.chunks, size=args.size, gpu=args.gpu, videos=args.videos)
+    folders = crop_arenas(args.input, args.arenas, output=args.output, codec=args.codec, crf=args.crf, lossless=args.lossless, jobs=args.jobs, chunks=args.chunks, size=args.size, gpu=args.gpu, videos=args.videos)
+    if args.propose_rois:
+        return propose_rois(folders, executable=args.roi_proposer)
 
 
 if __name__ == "__main__":
