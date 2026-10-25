@@ -529,9 +529,8 @@ def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, 
 
 
 def find_roi_proposer():
-    """roi-proposer lives in the roi-proposer environment, next to this one"""
-    if shutil.which("roi-proposer"):
-        return shutil.which("roi-proposer")
+    """roi-proposer lives in the roi-proposer environment, next to this one (PATH is only a fallback,
+    other environments ship an older roi-proposer)"""
     envs = [os.path.dirname(sys.prefix)]
     if os.environ.get("CONDA_EXE"):
         envs.append(os.path.join(os.path.dirname(os.path.dirname(os.environ["CONDA_EXE"])), "envs"))
@@ -539,6 +538,8 @@ def find_roi_proposer():
         path = os.path.join(env_dir, "roi-proposer", "bin", "roi-proposer")
         if os.path.exists(path):
             return path
+    if shutil.which("roi-proposer"):
+        return shutil.which("roi-proposer")
     raise FileNotFoundError("roi-proposer not found in the roi-proposer environment, pass --roi-proposer")
 
 
