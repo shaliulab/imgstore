@@ -41,6 +41,11 @@ Files that are the same for all arenas (camera .pfs file, chunk .extra.json envi
 are soft linked into each arena folder, and chunk snapshots (.png) are cropped like the videos.
 Pass --no-videos to only do this in arena folders produced before
 
+Pass --resume to continue a run that was killed: chunks already cropped for all arenas are skipped,
+and the files of the chunks it was writing (possibly corrupted) are deleted and cropped again.
+A chunk is done when every arena folder has its video and a complete copy of its .npz index,
+which is only written after all its arena videos are encoded
+
 Once all arenas are cropped, roi-proposer propose (from the roi-proposer environment) is run
 on all arena folders to propose their DATE_TIME.toml and landmarks.toml. Pass --no-roi-proposer to skip it
 
@@ -329,11 +334,47 @@ def _crop_chunk(video, outputs, extension, codec, crf, lossless, gpu):
     if process.returncode != 0:
         raise RuntimeError(f"ffmpeg failed on {video} (exit code {process.returncode}):\n{process.stderr}")
 
-    index = video[:-len(os.path.splitext(video)[1])] + ".npz"
+    index = _index_path(video)
     for output, _, _ in outputs:
-        shutil.copy(index, os.path.join(output, chunk + ".npz"))
+        # copy then rename, so that a complete .npz marks a chunk done for --resume
+        dest = os.path.join(output, chunk + ".npz")
+        shutil.copy(index, dest + ".part")
+        os.replace(dest + ".part", dest)
 
     return encoder_args
+
+
+def _index_path(video):
+    return video[:-len(os.path.splitext(video)[1])] + ".npz"
+
+
+def _chunk_files(output, chunk, extension):
+    name = os.path.join(output, "%06d" % chunk)
+    return name + extension, name + ".npz", name + ".npz.part"
+
+
+def _chunk_done(chunk, video, outputs, extension):
+    """
+    True if every arena has the video of the chunk and a complete copy of its .npz index
+    (the size is checked too, runs before the .npz copy was atomic may have left a truncated one)
+    """
+    size = os.path.getsize(_index_path(video))
+    for output, _, _ in outputs:
+        arena_video, index, _ = _chunk_files(output, chunk, extension)
+        if not os.path.exists(arena_video) or not os.path.exists(index) or os.path.getsize(index) != size:
+            return False
+    return True
+
+
+def _remove_chunk(chunk, outputs, extension):
+    """
+    Delete the (possibly partial) files of a chunk in all arenas
+    """
+    for output, _, _ in outputs:
+        for path in _chunk_files(output, chunk, extension):
+            if os.path.lexists(path):
+                logger.info("Removing incomplete %s", path)
+                os.remove(path)
 
 
 def _gpu_busy(process):
@@ -436,11 +477,12 @@ def complete_arena_folder(folder, chunks=None):
     crop_snapshots(basedir, folder, arena["bbox"], arena["offset"], metadata[STORE_MD_KEY]["imgshape"], chunks=chunks)
 
 
-def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, jobs=4, chunks=None, size=None, gpu=False, videos=True):
+def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, jobs=4, chunks=None, size=None, gpu=False, videos=True, resume=False):
     """
     size: (width, height) of all output videos. ROIs are cropped to their bounding box
     and padded with white up to this size, with the ROI center in the center of the frame.
     If None, each output video has the size of the bounding box of its ROI
+    resume: skip the chunks already cropped for all arenas, and redo the incomplete ones
     """
     for program in ("ffmpeg", "ffprobe"):
         if videos and shutil.which(program) is None:
@@ -507,11 +549,25 @@ def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, 
             "offset": offset.tolist(),
             "polygon_in_arena": (polygon - offset).tolist(),
         }
+        metadata_path = os.path.join(folder, STORE_MD_FILENAME)
+        if resume and os.path.exists(metadata_path):
+            _check_resumable(metadata_path, arena_metadata)
+            with open(metadata_path, "r") as filehandle:
+                arena_metadata[STORE_MD_KEY]["uuid"] = yaml.load(filehandle, Loader=yaml.SafeLoader)[STORE_MD_KEY]["uuid"]
+
         with open(os.path.join(folder, STORE_MD_FILENAME), "w") as filehandle:
             yaml.safe_dump(arena_metadata, filehandle)
 
         logger.info("Arena %s: x=%s:%s, y=%s:%s (%sx%s) -> %s %sx%s", i + 1, x0, x1, y0, y1, x1 - x0, y1 - y0, folder, shape[1], shape[0])
         outputs.append((folder, bbox, padding))
+
+    if resume:
+        done = [chunk for chunk, video in video_chunks.items() if _chunk_done(chunk, video, outputs, extension)]
+        for chunk in done:
+            del video_chunks[chunk]
+        for chunk in video_chunks:
+            _remove_chunk(chunk, outputs, extension)
+        logger.info("Resuming: %s chunks already cropped, %s to crop", len(done), len(video_chunks))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as executor:
         futures = {
@@ -526,6 +582,19 @@ def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, 
         complete_arena_folder(folder, chunks=chunks)
 
     return [folder for folder, _, _ in outputs]
+
+
+def _check_resumable(metadata_path, arena_metadata):
+    """
+    Refuse to resume into an arena folder produced with a different crop (arenas, --size or input)
+    """
+    with open(metadata_path, "r") as filehandle:
+        previous = yaml.load(filehandle, Loader=yaml.SafeLoader)
+    for key in ("source", "bbox", "offset"):
+        if previous.get("arena", {}).get(key) != arena_metadata["arena"][key]:
+            raise ValueError(f"Cannot resume: {key} of {metadata_path} differs from this run. Run without --resume to start from scratch")
+    if previous[STORE_MD_KEY].get("imgshape") != arena_metadata[STORE_MD_KEY]["imgshape"]:
+        raise ValueError(f"Cannot resume: imgshape of {metadata_path} differs from this run. Run without --resume to start from scratch")
 
 
 def find_roi_proposer():
@@ -585,6 +654,9 @@ def get_parser():
     parser.add_argument("--no-videos", dest="videos", action="store_false", default=True, help="""
         Do not crop the videos. Only link the files shared by all arenas and crop the snapshots
         in the arena folders produced before""")
+    parser.add_argument("--resume", action="store_true", default=False, help="""
+        Continue a killed run: skip the chunks already cropped for all arenas,
+        delete the files of the incomplete ones and crop them again""")
     parser.add_argument("--roi-proposer", default=None, help="roi-proposer executable (default: the one in the roi-proposer environment)")
     parser.add_argument("--no-roi-proposer", dest="propose_rois", action="store_false", default=True, help="""
         Do not run roi-proposer propose on the arena folders after cropping them""")
@@ -594,7 +666,7 @@ def get_parser():
 def main():
     logging.basicConfig(level=logging.INFO)
     args = get_parser().parse_args()
-    folders = crop_arenas(args.input, args.arenas, output=args.output, codec=args.codec, crf=args.crf, lossless=args.lossless, jobs=args.jobs, chunks=args.chunks, size=args.size, gpu=args.gpu, videos=args.videos)
+    folders = crop_arenas(args.input, args.arenas, output=args.output, codec=args.codec, crf=args.crf, lossless=args.lossless, jobs=args.jobs, chunks=args.chunks, size=args.size, gpu=args.gpu, videos=args.videos, resume=args.resume)
     if args.propose_rois:
         return propose_rois(folders, executable=args.roi_proposer)
 
