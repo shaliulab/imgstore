@@ -116,7 +116,8 @@ class CV2Mixin:
     def _get_width(self):
         shape = self._metadata["imgshape"]
         if shape[0]!=shape[1]:
-            width=min(shape)
+            # the frames are made square when read
+            width=max(shape[:2]) if getattr(conf, "SQUARE_METHOD", "crop") == "pad" else min(shape)
         else:
             width = shape[1]
 
@@ -125,7 +126,8 @@ class CV2Mixin:
     def _get_height(self):
         shape = self._metadata["imgshape"]
         if shape[0]!=shape[1]:
-            height=min(shape)
+            # the frames are made square when read
+            height=max(shape[:2]) if getattr(conf, "SQUARE_METHOD", "crop") == "pad" else min(shape)
         else:
             height = shape[0]
 

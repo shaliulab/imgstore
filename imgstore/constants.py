@@ -30,3 +30,7 @@ LOOKUP_NEAREST=False
 LOGGING_FILE=os.path.join(os.environ["HOME"], ".config", "imgstore", "logging.yml")
 FIRST_FEED="master"
 RESHAPE_METHOD="resize"
+# How non square frames are made square: "crop" clips the longest side,
+# "pad" adds black pixels to the bottom / right of the shortest side.
+# Both keep the top left corner in place, so pixel coordinates do not change
+SQUARE_METHOD="crop"

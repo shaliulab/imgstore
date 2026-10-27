@@ -10,6 +10,7 @@ import warnings
 import codetiming
 import cv2
 import numpy as np
+from confapp import conf
 from imgstore.constants import STORE_MD_KEY, VERBOSE_DEBUG_CHUNKS
 from imgstore.util import ensure_color, ensure_grayscale, ensure_square
 from imgstore.stores.utils.formats import get_formats
@@ -484,7 +485,7 @@ class VideoImgStore(_ImgStore):
         
         if self._square:
             with codetiming.Timer(text="Ensuring square took {milliseconds:.0f} ms", logger=logger.debug):
-                img=ensure_square(img)
+                img=ensure_square(img, method=getattr(conf, "SQUARE_METHOD", "crop"))
 
         if self._metadata.get("apply_blur", False):
             with codetiming.Timer(text="Applying gaussian blur took {milliseconds:.0f} ms", logger=logger.debug):

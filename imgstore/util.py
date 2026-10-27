@@ -36,11 +36,19 @@ def _cvt_color(img, code, ensure_copy=True):
 def ensure_grayscale(img, ensure_copy=False):
     return _cvt_color(img, cv2.COLOR_BGR2GRAY, ensure_copy=ensure_copy)
 
-def ensure_square(img):
+def ensure_square(img, method="crop"):
     """
     If the image is rectangular,
-    clip the longest side to the length of the shortest side
+    clip the longest side to the length of the shortest side (method="crop")
+    or pad the shortest side with black pixels to the length of the longest side (method="pad")
     """
+    if method == "pad":
+        side = max(img.shape[:2])
+        if img.shape[0] != img.shape[1]:
+            pad = [(0, side - img.shape[0]), (0, side - img.shape[1])] + [(0, 0)] * (img.ndim - 2)
+            img = np.pad(img, pad)
+        return img
+
     if img.shape[0] > img.shape[1]:
         img=img[:img.shape[1], :img.shape[1]]
     elif img.shape[0] < img.shape[1]:
