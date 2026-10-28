@@ -26,6 +26,9 @@ Alternatively, one table per arena with either a polygon or x, y, width, height
     [[arenas]]
     polygon = [[x, y], [x, y], ...]
 
+Arena videos are always square, because imgstore crops non square frames when it reads them.
+By default each ROI is cropped to its bounding box, which is padded with white on the bottom or
+the right to a square, so the top left corner of the arena video is the one of the bounding box.
 Pass --size 1024 to give all arena videos the same size: each ROI is cropped to its
 bounding box and padded with white to 1024x1024, with the ROI center in the center
 of the frame (the pixel scale is not changed). The arena block of each metadata.yaml
@@ -479,9 +482,10 @@ def complete_arena_folder(folder, chunks=None):
 
 def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, jobs=4, chunks=None, size=None, gpu=False, videos=True, resume=False):
     """
-    size: (width, height) of all output videos. ROIs are cropped to their bounding box
+    size: (width, height) of all output videos, which must be square. ROIs are cropped to their bounding box
     and padded with white up to this size, with the ROI center in the center of the frame.
-    If None, each output video has the size of the bounding box of its ROI
+    If None, each output video is the bounding box of its ROI, padded with white
+    on the bottom or the right to a square
     resume: skip the chunks already cropped for all arenas, and redo the incomplete ones
     """
     for program in ("ffmpeg", "ffprobe"):
@@ -518,9 +522,12 @@ def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, 
     for i, polygon in enumerate(polygons):
         bbox = x0, y0, x1, y1 = get_bbox(polygon, imgshape)
         if size is None:
-            padding = None
+            # square frames: imgstore crops non square frames when it reads them.
+            # Padding the bottom / right keeps the top left corner of the bbox in place
+            side = max(x1 - x0, y1 - y0)
+            padding = None if (x1 - x0) == (y1 - y0) else (side, side, 0, 0)
             pad_x = pad_y = 0
-            shape = [y1 - y0, x1 - x0]
+            shape = [side, side]
         else:
             pad_x, pad_y = get_padding(polygon, bbox, size)
             padding = (size[0], size[1], pad_x, pad_y)
@@ -627,12 +634,14 @@ def propose_rois(folders, executable=None):
 
 def parse_size(value):
     """
-    Parse 1024 or 1024x768 (width x height)
+    Parse 1024 or 1024x1024 (width x height)
     """
     width, _, height = value.lower().partition("x")
     size = (int(width), int(height or width))
     if any(v <= 0 or v % 2 for v in size):
         raise argparse.ArgumentTypeError(f"--size must be positive and even, got {value}")
+    if size[0] != size[1]:
+        raise argparse.ArgumentTypeError(f"--size must be square (imgstore crops non square frames), got {value}")
     return size
 
 
@@ -642,9 +651,9 @@ def get_parser():
     parser.add_argument("--arenas", required=True, help="Path to the arenas.toml file")
     parser.add_argument("--output", default=None, help="Output folder. Default: arenas/ next to the input metadata.yaml")
     parser.add_argument("--size", type=parse_size, default=None, help="""
-        Common size of all arena videos, e.g. 1024 or 1024x1024 (width x height).
+        Common size of all arena videos, e.g. 1024 or 1024x1024 (width x height, must be square).
         Each ROI is cropped to its bounding box and padded with white to this size, centered.
-        Default: the size of each ROI's bounding box""")
+        Default: each ROI's bounding box, padded with white on the bottom or the right to a square""")
     parser.add_argument("--codec", default=None, help="ffmpeg video encoder, e.g. libx264 or h264_nvenc. Default: same codec as the source chunks")
     parser.add_argument("--gpu", action="store_true", default=False, help="Encode h264/hevc chunks on the NVIDIA GPU (h264_nvenc/hevc_nvenc), ~7x faster than libx264")
     parser.add_argument("--crf", type=int, default=12, help="Encoding quality for h264/hevc, lower is better (default 12, visually lossless)")
