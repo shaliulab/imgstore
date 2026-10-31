@@ -49,6 +49,10 @@ and the files of the chunks it was writing (possibly corrupted) are deleted and 
 A chunk is done when every arena folder has its video and a complete copy of its .npz index,
 which is only written after all its arena videos are encoded
 
+Pause a run by creating crop_arenas.pause next to the input metadata.yaml (touch it, or --pause-file):
+the chunks being encoded finish, and no new chunk starts until the file is removed. A pause file left
+by an earlier run is removed when a run starts
+
 Once all arenas are cropped, roi-proposer propose (from the roi-proposer environment) is run
 on all arena folders to propose their DATE_TIME.toml and landmarks.toml. Pass --no-roi-proposer to skip it
 
@@ -91,6 +95,37 @@ from imgstore.constants import STORE_MD_KEY, STORE_MD_FILENAME
 from imgstore.stores.utils.path import get_fullpath
 
 logger = logging.getLogger(__name__)
+
+# while this file exists (next to the input metadata.yaml) no new chunk starts
+PAUSE_FILE = "crop_arenas.pause"
+PAUSE_POLL = 5
+# printed at the start of a run, so that other tools know it can be paused
+PAUSE_MARK = "Pause file:"
+_pause_lock = threading.Lock()
+_paused = False
+
+
+def pause_path(input):
+    """The default pause file of a recording (metadata.yaml or its folder)."""
+    folder = os.path.dirname(input) if os.path.isfile(input) else input
+    return os.path.join(folder, PAUSE_FILE)
+
+
+def _wait_while_paused(pause_file):
+    """Blocks while pause_file exists. Called before a chunk starts, so the chunks being encoded finish."""
+    global _paused
+    if pause_file is None or not os.path.exists(pause_file):
+        return
+    with _pause_lock:
+        if not _paused:
+            _paused = True
+            logger.warning("Paused: %s exists. The chunks being encoded finish, no new chunk starts until it is removed", pause_file)
+    while os.path.exists(pause_file):
+        time.sleep(PAUSE_POLL)
+    with _pause_lock:
+        if _paused:
+            _paused = False
+            logger.warning("Resumed: %s removed", pause_file)
 
 POLYGON_KEYS = ("polygon", "points", "vertices", "contour", "roi")
 
@@ -306,11 +341,12 @@ def get_encoder_args(stream, codec=None, crf=12, lossless=False, gpu=False):
     return args
 
 
-def _crop_chunk(video, outputs, extension, codec, crf, lossless, gpu):
+def _crop_chunk(video, outputs, extension, codec, crf, lossless, gpu, pause_file=None):
     """
     Decode the chunk once and write one cropped video per arena,
-    encoded with the same codec as the source chunk
+    encoded with the same codec as the source chunk (after waiting while pause_file exists)
     """
+    _wait_while_paused(pause_file)
     chunk = os.path.basename(video)[:6]
     stream = probe_video(video)
     encoder_args = get_encoder_args(stream, codec=codec, crf=crf, lossless=lossless, gpu=gpu)
@@ -480,13 +516,14 @@ def complete_arena_folder(folder, chunks=None):
     crop_snapshots(basedir, folder, arena["bbox"], arena["offset"], metadata[STORE_MD_KEY]["imgshape"], chunks=chunks)
 
 
-def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, jobs=4, chunks=None, size=None, gpu=False, videos=True, resume=False):
+def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, jobs=4, chunks=None, size=None, gpu=False, videos=True, resume=False, pause_file=None):
     """
     size: (width, height) of all output videos, which must be square. ROIs are cropped to their bounding box
     and padded with white up to this size, with the ROI center in the center of the frame.
     If None, each output video is the bounding box of its ROI, padded with white
     on the bottom or the right to a square
     resume: skip the chunks already cropped for all arenas, and redo the incomplete ones
+    pause_file: no new chunk starts while it exists (default: crop_arenas.pause next to the input metadata.yaml)
     """
     for program in ("ffmpeg", "ffprobe"):
         if videos and shutil.which(program) is None:
@@ -576,9 +613,16 @@ def crop_arenas(input, arenas, output=None, codec=None, crf=12, lossless=False, 
             _remove_chunk(chunk, outputs, extension)
         logger.info("Resuming: %s chunks already cropped, %s to crop", len(done), len(video_chunks))
 
+    if pause_file is None:
+        pause_file = pause_path(basedir)
+    if os.path.exists(pause_file):
+        logger.info("Removing the pause file of an earlier run %s", pause_file)
+        os.remove(pause_file)
+    logger.info("%s %s (create it to pause: the chunks being encoded finish, no new chunk starts until it is removed)", PAUSE_MARK, pause_file)
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as executor:
         futures = {
-            executor.submit(_crop_chunk, video, outputs, extension, codec, crf, lossless, gpu): chunk
+            executor.submit(_crop_chunk, video, outputs, extension, codec, crf, lossless, gpu, pause_file): chunk
             for chunk, video in video_chunks.items()
         }
         for future in tqdm.tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Cropping chunks"):
@@ -666,6 +710,9 @@ def get_parser():
     parser.add_argument("--resume", action="store_true", default=False, help="""
         Continue a killed run: skip the chunks already cropped for all arenas,
         delete the files of the incomplete ones and crop them again""")
+    parser.add_argument("--pause-file", default=None, help="""
+        No new chunk starts while this file exists (the chunks being encoded finish).
+        Default: crop_arenas.pause next to the input metadata.yaml""")
     parser.add_argument("--roi-proposer", default=None, help="roi-proposer executable (default: the one in the roi-proposer environment)")
     parser.add_argument("--no-roi-proposer", dest="propose_rois", action="store_false", default=True, help="""
         Do not run roi-proposer propose on the arena folders after cropping them""")
@@ -675,7 +722,7 @@ def get_parser():
 def main():
     logging.basicConfig(level=logging.INFO)
     args = get_parser().parse_args()
-    folders = crop_arenas(args.input, args.arenas, output=args.output, codec=args.codec, crf=args.crf, lossless=args.lossless, jobs=args.jobs, chunks=args.chunks, size=args.size, gpu=args.gpu, videos=args.videos, resume=args.resume)
+    folders = crop_arenas(args.input, args.arenas, output=args.output, codec=args.codec, crf=args.crf, lossless=args.lossless, jobs=args.jobs, chunks=args.chunks, size=args.size, gpu=args.gpu, videos=args.videos, resume=args.resume, pause_file=args.pause_file)
     if args.propose_rois:
         return propose_rois(folders, executable=args.roi_proposer)
 
