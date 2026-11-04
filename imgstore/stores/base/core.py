@@ -195,7 +195,17 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
                 t0 = time.time()
                 self._chunk_n_and_chunk_paths = self._find_chunks(chunk_numbers=None)
                 self._log.debug('found %s chunks in in %fs' % (len(self._chunk_n_and_chunk_paths), time.time() - t0))
+                stale_chunks = []
                 if self.index_db_exists:
+                    # index.db is built once from the chunk indices (.npz), e.g. while imgstore-crop-arenas
+                    # is still writing the chunks. Rebuild it if chunks were written after it
+                    stale_chunks = ImgStoreIndex.stale_chunks(self.index_db_path, self._chunk_n_and_chunk_paths)
+                    if stale_chunks:
+                        self._log.warning(
+                            '%s is older than the index of %s chunks (%s ... %s), rebuilding it',
+                            self.index_db_path, len(stale_chunks), min(stale_chunks), max(stale_chunks)
+                        )
+                if self.index_db_exists and not stale_chunks:
                     # NOTE:
                     # This is a new feature that just performs a db connection
                     # to a sqlite3 version of the npz files of the imgstore
@@ -272,7 +282,7 @@ class _ImgStore(AbstractImgStore, ReadingStore, WritingStore, *MIXINS):
         try:
             first_fn=self._index.get_chunk_metadata(chunk)["frame_number"][0]
         except Exception as error:
-            print(f"Cannot find first frame of chunk {chunk}")
+            print(f"Cannot find first frame of chunk {chunk} in {self.index_db_path}")
             raise error
         img, (frame_number, frame_time) = self.get_image(max(0, first_fn))
         return img, (frame_number, frame_time)
