@@ -160,7 +160,13 @@ class ImgStoreIndex(object):
     def read_index_and_populate_database(cls, chunk_n_and_chunk_paths):
         path = os.path.join(os.path.dirname(chunk_n_and_chunk_paths[0][1]), SQLITE3_INDEX_FILE)
         records_and_stats = cls.read_records(chunk_n_and_chunk_paths)
-        cls.populate_database(path, records_and_stats)
+        # write to a temporary file and rename it, so that an existing (stale) index.db is replaced
+        # and other processes opening the store at the same time never read a half written index.db
+        tmp_path = "%s.%s.%s.part" % (path, os.uname().nodename, os.getpid())
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        cls.populate_database(tmp_path, records_and_stats).close()
+        os.replace(tmp_path, path)
         db=cls.populate_database(':memory:', records_and_stats)
         return db, path
 
@@ -239,6 +245,23 @@ class ImgStoreIndex(object):
 
         return cls(db)
 
+
+    @staticmethod
+    def stale_chunks(path, chunk_n_and_chunk_paths):
+        """
+        Chunks whose index (.npz / .yaml) is newer than the index.db in path,
+        i.e. chunks written (or rewritten) after index.db was built from them.
+        Empty chunks are never in index.db, so comparing chunk numbers would flag them every time
+        """
+        db_mtime = os.path.getmtime(path)
+        stale = []
+        for chunk_n, chunk_path in chunk_n_and_chunk_paths:
+            for extension in ('.npz', '.yaml'):
+                if os.path.exists(chunk_path + extension):
+                    if os.path.getmtime(chunk_path + extension) > db_mtime:
+                        stale.append(chunk_n)
+                    break
+        return stale
 
     @classmethod
     def new_from_file(cls, path):
